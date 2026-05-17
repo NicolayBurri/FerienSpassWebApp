@@ -1,0 +1,130 @@
+﻿@page "/user/konto"
+
+@using Microsoft.AspNetCore.Identity
+@using FerienspassWebApp.Models
+@using FerienspassWebApp.Data
+@using Microsoft.EntityFrameworkCore
+
+@inject UserManager<ApplicationUser> UserManager
+@inject AuthenticationStateProvider AuthStateProvider
+@inject ApplicationDbContext Db
+
+<h3>Konto</h3>
+
+@if (user == null)
+{
+    <p>Lade Daten...</p>
+}
+else
+{
+    <div style="display:flex; flex-direction:column; gap:8px; max-width:400px;">
+
+        <label>Vorname</label>
+        <input @bind="user.Vorname" />
+
+        <label>Nachname</label>
+        <input @bind="user.Nachname" />
+
+        <label>Strasse</label>
+        <input @bind="user.Strasse" />
+
+        <label>PLZ</label>
+        <input @bind="user.PLZ" />
+
+        <label>Ort</label>
+        <input @bind="user.Ort" />
+
+        <label>Telefonnummer</label>
+        <input @bind="user.Telefonnummer" />
+
+        <button @onclick="Save">Speichern</button>
+
+        @if (!string.IsNullOrEmpty(message))
+        {
+            <p style="color:green">@message</p>
+        }
+    </div>
+
+    <hr />
+    <h4>Notfallkontakte</h4>
+
+    <input placeholder="Name" @bind="newContact.Name" />
+    <input placeholder="Telefon" @bind="newContact.Telefon" />
+    <input placeholder="Beziehung" @bind="newContact.Beziehung" />
+
+    <button @onclick="AddContact">Hinzufügen</button>
+
+    <hr />
+
+    @foreach (var c in contacts)
+    {
+        <div style="margin-bottom:8px; border:1px solid #ddd; padding:8px;">
+            <b>@c.Name</b> - @c.Telefon (@c.Beziehung)
+
+            <button @onclick="() => DeleteContact(c)">Löschen</button>
+        </div>
+    }
+}
+
+@code {
+    private ApplicationUser? user;
+    private string? message;
+
+    private List<EmergencyContact> contacts = new();
+    private EmergencyContact newContact = new();
+
+    private string? userId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        userId = UserManager.GetUserId(authState.User);
+
+        if (string.IsNullOrEmpty(userId))
+            return;
+
+        user = await UserManager.FindByIdAsync(userId);
+
+        contacts = await Db.EmergencyContacts
+            .Where(c => c.ApplicationUserId == userId)
+            .ToListAsync();
+    }
+
+    private async Task Save()
+    {
+        if (user == null) return;
+
+        var result = await UserManager.UpdateAsync(user);
+
+        message = result.Succeeded
+            ? "Gespeichert!"
+            : "Fehler beim Speichern";
+    }
+
+    async Task AddContact()
+    {
+        if (string.IsNullOrEmpty(userId))
+            return;
+
+        newContact.ApplicationUserId = userId;
+
+        Db.EmergencyContacts.Add(newContact);
+        await Db.SaveChangesAsync();
+
+        newContact = new EmergencyContact();
+
+        contacts = await Db.EmergencyContacts
+            .Where(c => c.ApplicationUserId == userId)
+            .ToListAsync();
+    }
+
+    async Task DeleteContact(EmergencyContact contact)
+    {
+        Db.EmergencyContacts.Remove(contact);
+        await Db.SaveChangesAsync();
+
+        contacts = await Db.EmergencyContacts
+            .Where(c => c.ApplicationUserId == contact.ApplicationUserId)
+            .ToListAsync();
+    }
+}

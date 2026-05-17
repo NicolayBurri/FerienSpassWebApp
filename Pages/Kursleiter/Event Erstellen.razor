@@ -1,0 +1,246 @@
+﻿@page "/kursleiter/event erstellen"
+
+@using FerienspassWebApp.Models
+@using FerienspassWebApp.Data
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Authorization
+
+@inject ApplicationDbContext Db
+
+@attribute [Authorize(Roles = "Admin,Kursleiter")]
+
+<PageTitle>Event Erstellen</PageTitle>
+
+<div style="display:flex; flex-direction:column; gap:8px; max-width:500px;">
+
+    <input placeholder="Eventname" @bind="ev.Eventname" />
+    <input placeholder="Location" @bind="ev.Location" />
+    <input placeholder="Treffpunkt" @bind="ev.Treffpunkt" />
+    <label>Kategorie</label>
+    <select @bind="ev.Kategorie">
+        @foreach (var k in Enum.GetValues<EventKategorie>())
+        {
+            <option value="@k">@k</option>
+        }
+    </select>
+
+    <label>Kursleiter / Admins</label>
+
+    <div style="
+    border:1px solid #ccc;
+    padding:10px;
+    border-radius:8px;
+    display:flex;
+    flex-direction:column;
+    gap:6px;">
+
+        @foreach (var u in users)
+        {
+            <label style="display:flex; gap:8px; align-items:center;">
+
+                <input type="checkbox"
+                       checked="@selectedUserIds.Contains(u.Id)"
+                       @onchange="e => ToggleUser(u.Id, (bool)e.Value!)" />
+
+                @u.UserName
+
+            </label>
+        }
+    </div>
+    
+
+    <hr/>
+
+    <p>Maximal anzahl Kinder</p>
+    <input type="number" placeholder="Max Kinder" @bind="ev.MaxKinder" />
+
+    <p>Minimum anzahl Kinder</p>
+    <input type="number" placeholder="Min Kinder" @bind="ev.MinKinder" />
+
+    <p>Preis</p>
+    <input type="number" placeholder="Preis" @bind="ev.price" />
+
+    <hr />
+
+    <label>
+        <input type="checkbox" @bind="ev.BrauchtBetreuung" />
+        Zusätzliche Betreuung erforderlich
+    </label>
+
+    @if (ev.BrauchtBetreuung)
+    {
+        <input type="number" placeholder="Anzahl Betreuungspersonen" @bind="ev.AnzahlBetreuung" />
+    }
+
+    <label>
+        <input type="checkbox" @bind="ev.BrauchtFahrer" />
+        Fahrer Notwendig
+    </label>
+
+    @if (ev.BrauchtFahrer)
+    {
+        <input type="number" placeholder="Anzahl Sitzplätze für Autfahrt" @bind="ev.AnzahlSitzplaetze" />
+    }
+
+    <hr />
+
+    <input type="number" placeholder="Min Alter" @bind="ev.AlterMin" />
+    <input type="number" placeholder="Max Alter" @bind="ev.AlterMax" />
+
+    <hr />
+
+    <input type="datetime-local" value="@ev.StartZeit?.ToString("yyyy-MM-ddTHH:mm")"
+           @onchange="e => ev.StartZeit = DateTime.Parse(e.Value.ToString())" />
+
+    <input type="datetime-local" value="@ev.EndeZeit?.ToString("yyyy-MM-ddTHH:mm")"
+           @onchange="e => ev.EndeZeit = DateTime.Parse(e.Value.ToString())" />
+
+    <hr />
+
+    <div style="border:2px dashed #ccc; padding:20px; text-align:center;">
+        <p>Bild hier hineinziehen oder klicken</p>
+        <InputFile OnChange="HandleFileUpload" />
+    </div>
+
+    @if (!string.IsNullOrEmpty(ev.BildUrl))
+    {
+        <p>Vorschau:</p>
+        <img src="@ev.BildUrl" style="max-width:200px;" />
+    }
+
+    <hr />
+
+    <textarea placeholder="Beschreibung" @bind="ev.Beschreibung"></textarea>
+
+    <button @onclick="Save">Speichern</button>
+
+    @if (!string.IsNullOrEmpty(msg))
+    {
+        <p style="color:green">@msg</p>
+    }
+
+</div>
+
+@code {
+    private Event ev = new();
+    private string? msg;
+
+    private List<ApplicationUser> users = new();
+    private List<string> selectedUserIds = new();
+
+    protected override void OnInitialized()
+    {
+        users = Db.Users.ToList();
+    }
+
+    private async Task HandleFileUpload(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+
+        if (file == null)
+            return;
+
+        if (!file.ContentType.StartsWith("image/"))
+        {
+            msg = "Nur Bilder Erlaubt!";
+            return;
+        }
+
+        var folderPath = Path.Combine("wwwroot", "images", "events");
+
+        if (!Directory.Exists(folderPath))
+            Directory.CreateDirectory(folderPath);
+
+        var safeName = (ev.Eventname ?? "event").Replace(" ", "_");
+
+        var fileName = $"{safeName}_{DateTime.Now.Ticks}{Path.GetExtension(file.Name)}";
+
+        var fullPath = Path.Combine(folderPath, fileName);
+
+        using (var stream = new FileStream(fullPath, FileMode.Create))
+        {
+            await file.OpenReadStream(5 * 1024 * 1024).CopyToAsync(stream); // max 5MB
+        }
+
+        ev.BildUrl = $"images/events/{fileName}";
+    }
+
+    private async Task<List<string>> CheckKursleiterConflicts()
+    {
+        var conflictingUsers = new List<string>();
+
+        foreach (var userId in selectedUserIds)
+        {
+            bool hasConflict = await Db.EventKursleiter
+                .Include(x => x.Event)
+                .AnyAsync(x =>
+                    x.UserId == userId &&
+
+                    // anderes Event
+                    x.Event.Id != ev.Id &&
+
+                    // Zeit überschneidet sich
+                    ev.StartZeit < x.Event.EndeZeit &&
+                    ev.EndeZeit > x.Event.StartZeit
+                );
+
+            if (hasConflict)
+            {
+                var user = await Db.Users.FirstOrDefaultAsync(x => x.Id == userId);
+
+                if (user != null)
+                {
+                    conflictingUsers.Add(user.UserName!);
+                }
+            }
+        }
+
+        return conflictingUsers;
+    }
+
+    private void ToggleUser(string userId, bool isChecked)
+    {
+        if (isChecked)
+        {
+            if (!selectedUserIds.Contains(userId))
+            {
+                selectedUserIds.Add(userId);
+            }
+        }
+        else
+        {
+            selectedUserIds.Remove(userId);
+        }
+    }
+
+    async Task Save()
+    {
+        var conflicts = await CheckKursleiterConflicts();
+
+        if (conflicts.Any())
+        {
+            msg = "Konflikt bei: " + string.Join(", ", conflicts);
+            return;
+        }
+
+        Db.Events.Add(ev);
+        await Db.SaveChangesAsync();
+
+        foreach (var userId in selectedUserIds)
+        {
+            Db.EventKursleiter.Add(new EventKursleiter
+                {
+                    EventId = ev.Id,
+                    UserId = userId
+                });
+        }
+
+        await Db.SaveChangesAsync();
+
+        ev = new Event();
+        selectedUserIds.Clear();
+
+        msg = "Event gespeichert!";
+    }
+}

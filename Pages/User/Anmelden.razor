@@ -1,0 +1,493 @@
+﻿@page "/user/anmelden/{eventId:int}"
+
+@using Microsoft.EntityFrameworkCore
+@using FerienspassWebApp.Data
+@using FerienspassWebApp.Models
+
+@inject ApplicationDbContext Db
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager Navigation
+
+<h3>Event Anmeldung</h3>
+
+@if (isLoading)
+{
+    <p>Lade...</p>
+}
+else if (ev == null)
+{
+    <p>Event nicht gefunden.</p>
+}
+else
+{
+    <div style="max-width:700px;">
+
+        <h4>@ev.Eventname</h4>
+
+        @if (!string.IsNullOrEmpty(ev.BildUrl))
+        {
+            <img src="@ev.BildUrl"
+                 style="width:100%;
+                        max-height:350px;
+                        object-fit:cover;
+                        border-radius:10px;" />
+        }
+
+        <div style="margin-top:15px;">
+
+            <p><b>Ort:</b> @ev.Location</p>
+
+            <p><b>Treffpunkt:</b> @ev.Treffpunkt</p>
+
+            @if (ev.Kursleiter?.Any() == true)
+            {
+                <p><b>Kursleiter:</b></p>
+                <ul>
+                    @foreach (var k in ev.Kursleiter)
+                    {
+                        <li>@k.User.UserName</li>
+                    }
+                </ul>
+            }
+
+            <p>
+                <b>Zeit:</b>
+
+                @ev.StartZeit?.ToString("dd.MM.yyyy HH:mm")
+                -
+
+                @ev.EndeZeit?.ToString("dd.MM.yyyy HH:mm")
+            </p>
+
+            <p>
+                <b>Alter:</b>
+                @ev.AlterMin - @ev.AlterMax Jahre
+            </p>
+
+            <p>
+                <b>Preis:</b>
+                CHF @ev.price
+            </p>
+
+            <p>
+                <b>Beschreibung:</b><br />
+                @ev.Beschreibung
+            </p>
+
+        </div>
+
+        <hr />
+
+        @if (ev.IsFull)
+        {
+            <p style="color:red; font-weight:bold;">
+                AUSGEBUCHT
+            </p>
+        }
+
+        <h4>Kind anmelden</h4>
+
+        @foreach (var c in children)
+        {
+            <div>
+                <label>
+
+                    <input type="checkbox"
+                           checked="@selectedChildren.Contains(c.Id)"
+                           @onchange="e => ToggleChild(c.Id, (bool)e.Value!)" />
+
+                    @c.Name
+
+                </label>
+            </div>
+        }
+
+        <br />
+
+        @if (ev.BrauchtBetreuung)
+        {
+            <label>
+                <input type="checkbox" @bind="willHelp" />
+                Ich helfe als Betreuungsperson.
+            </label>
+        }
+
+        <br /><br />
+
+        @if (ev.BrauchtFahrer)
+        {
+            <label>
+                <input type="checkbox" @bind="willDrive" />
+                Ich kann fahren.
+            </label>
+
+            <br />
+
+            <br />
+
+            @if (willDrive)
+            {
+                <input type="number"
+                       placeholder="Freie Sitzplätze"
+                       @bind="driverSeats" />
+            }
+        }
+
+        <br /><br />
+
+        <button class="btn btn-primary"
+                @onclick="Register"
+                disabled="@isSubmitting">
+
+            @(isSubmitting ? "Anmeldung läuft..." : "Anmelden")
+
+        </button>
+
+        <br /><br />
+
+        @if (results.Any())
+        {
+            <hr />
+
+            <h4>Ergebnis</h4>
+
+            @foreach (var r in results)
+            {
+                <p style="color:@r.Color">
+                    @r.ChildName → @r.Status
+                </p>
+            }
+        }
+
+    </div>
+}
+
+@if (showPopup)
+{
+    <div class="popup-backdrop" @onclick="ClosePopup">
+        <div class="popup-box" @onclick:stopPropagation="true">
+
+            <h4>Anmeldung erfolgreich</h4>
+
+            <p>Möchtest du zur Rechnung gehen oder weitere Events buchen?</p>
+
+            <div style="display:flex; gap:10px; justify-content:center; margin-top:15px;">
+                <button class="btn btn-primary" @onclick="GoToInvoice">
+                    Zur Rechnung
+                </button>
+
+                <button class="btn btn-secondary" @onclick="ContinueBooking">
+                    Weitere Events
+                </button>
+            </div>
+
+        </div>
+    </div>
+}
+
+@code {
+
+    [Parameter]
+    public int eventId { get; set; }
+
+    private Event? ev;
+
+    private List<Child> children = new();
+
+    private List<int> selectedChildren = new();
+
+    private bool willHelp;
+    private bool willDrive;
+
+    private int driverSeats;
+
+    private string? currentUserId;
+
+    private bool isLoading = true;
+
+    private bool isSubmitting = false;
+
+    private class RegistrationResult
+    {
+        public string ChildName { get; set; } = "";
+
+        public string Status { get; set; } = "";
+
+        public string Color { get; set; } = "black";
+    }
+
+    private List<RegistrationResult> results = new();
+
+    private bool showPopup = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var auth = await AuthStateProvider.GetAuthenticationStateAsync();
+
+            currentUserId = auth.User
+                .FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)
+                ?.Value;
+
+            if (string.IsNullOrEmpty(currentUserId))
+                return;
+
+            ev = await Db.Events
+                .FirstOrDefaultAsync(x => x.Id == eventId);
+
+            children = await Db.Children
+                .Where(x => x.ParentUserId == currentUserId)
+                .OrderBy(x => x.Name)
+                .ToListAsync();
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void GoToInvoice()
+    {
+        showPopup = false;
+
+        Navigation.NavigateTo($"/User/Rechnung-erstellen");
+    }
+
+    void ClosePopup()
+    {
+        showPopup = false;
+    }
+
+    private void ContinueBooking()
+    {
+        showPopup = false;
+
+        Navigation.NavigateTo("/User/Kalender");
+    }
+
+    void ToggleChild(int childId, bool isChecked)
+    {
+        if (isChecked)
+        {
+            if (!selectedChildren.Contains(childId))
+            {
+                selectedChildren.Add(childId);
+            }
+        }
+        else
+        {
+            selectedChildren.Remove(childId);
+        }
+    }
+
+    async Task Register()
+    {
+        if (isSubmitting)
+            return;
+
+        isSubmitting = true;
+        results.Clear();
+
+        try
+        {
+            if (ev == null)
+                return;
+
+            var settings = await Db.SystemSettings.FirstOrDefaultAsync();
+
+            if (settings == null)
+            {
+                results.Add(new RegistrationResult
+                    {
+                        ChildName = "",
+                        Status = "System nicht konfiguriert",
+                        Color = "red"
+                    });
+                return;
+            }
+
+            var now = DateTime.Now;
+
+            bool kursleiterPhase =
+                settings.KursleiterStart <= now &&
+                settings.KursleiterEnde >= now;
+
+            bool elternPhase =
+                settings.AnmeldungStart <= now &&
+                settings.AnmeldungEnde >= now;
+
+            var auth = await AuthStateProvider.GetAuthenticationStateAsync();
+
+            bool isKursleiterUser =
+                auth.User.IsInRole("Kursleiter") ||
+                auth.User.IsInRole("Admin");
+
+            // 🔐 PHASEN-CHECK
+            if (isKursleiterUser)
+            {
+                if (!kursleiterPhase)
+                {
+                    results.Add(new RegistrationResult
+                        {
+                            ChildName = "",
+                            Status = "Kursleiter-Anmeldung noch nicht aktiv",
+                            Color = "red"
+                        });
+                    return;
+                }
+            }
+            else
+            {
+                if (!elternPhase)
+                {
+                    results.Add(new RegistrationResult
+                        {
+                            ChildName = "",
+                            Status = "Eltern-Anmeldung noch nicht aktiv",
+                            Color = "red"
+                        });
+                    return;
+                }
+            }
+
+            using var transaction =
+                await Db.Database.BeginTransactionAsync(
+                    System.Data.IsolationLevel.Serializable);
+
+            foreach (var childId in selectedChildren)
+            {
+                var child = await Db.Children
+                    .FirstOrDefaultAsync(x =>
+                        x.Id == childId &&
+                        x.ParentUserId == currentUserId);
+
+                if (child == null)
+                    continue;
+
+                var exists = await Db.EventChildren
+                    .AnyAsync(x =>
+                        x.EventId == ev.Id &&
+                        x.ChildId == child.Id);
+
+                if (exists)
+                {
+                    results.Add(new RegistrationResult
+                        {
+                            ChildName = child.Name,
+                            Status = "bereits angemeldet",
+                            Color = "orange"
+                        });
+                    continue;
+                }
+
+                if (ev.AlterMin.HasValue && child.Alter < ev.AlterMin.Value)
+                {
+                    results.Add(new RegistrationResult
+                        {
+                            ChildName = child.Name,
+                            Status = $"zu jung ({child.Alter})",
+                            Color = "red"
+                        });
+                    continue;
+                }
+
+                if (ev.AlterMax.HasValue && child.Alter > ev.AlterMax.Value)
+                {
+                    results.Add(new RegistrationResult
+                        {
+                            ChildName = child.Name,
+                            Status = $"zu alt ({child.Alter})",
+                            Color = "red"
+                        });
+                    continue;
+                }
+
+                var conflict = await Db.EventChildren
+                    .AnyAsync(x =>
+                        x.ChildId == child.Id &&
+                        x.Event.StartZeit < ev.EndeZeit &&
+                        x.Event.EndeZeit > ev.StartZeit);
+
+                if (conflict)
+                {
+                    results.Add(new RegistrationResult
+                        {
+                            ChildName = child.Name,
+                            Status = "Zeitkonflikt",
+                            Color = "red"
+                        });
+                    continue;
+                }
+
+                int currentConfirmed =
+                    await Db.EventChildren.CountAsync(x =>
+                        x.EventId == ev.Id &&
+                        x.Status == EnrollmentStatus.Confirmed);
+
+                int currentWaiting =
+                    await Db.EventChildren.CountAsync(x =>
+                        x.EventId == ev.Id &&
+                        x.Status == EnrollmentStatus.WaitingList);
+
+                EnrollmentStatus status;
+
+                if (currentConfirmed < ev.MaxKinder)
+                {
+                    status = EnrollmentStatus.Confirmed;
+                }
+                else if (currentWaiting < ev.WaitlisteLimit)
+                {
+                    status = EnrollmentStatus.WaitingList;
+                }
+                else
+                {
+                    results.Add(new RegistrationResult
+                        {
+                            ChildName = child.Name,
+                            Status = "kein Platz verfügbar",
+                            Color = "red"
+                        });
+                    continue;
+                }
+
+                Db.EventChildren.Add(new EventChild
+                    {
+                        EventId = ev.Id,
+                        ChildId = child.Id,
+                        Status = status,
+                        RegisteredAt = DateTime.Now
+                    });
+
+                results.Add(new RegistrationResult
+                    {
+                        ChildName = child.Name,
+                        Status = status == EnrollmentStatus.Confirmed
+                            ? "bestätigt"
+                            : "Warteliste",
+                        Color = status == EnrollmentStatus.Confirmed
+                            ? "green"
+                            : "darkorange"
+                    });
+            }
+
+            await Db.SaveChangesAsync();
+            await transaction.CommitAsync();
+
+            showPopup = true;
+        }
+        catch (Exception ex)
+        {
+            results.Add(new RegistrationResult
+                {
+                    ChildName = "",
+                    Status = $"Fehler: {ex.Message}",
+                    Color = "red"
+                });
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+}

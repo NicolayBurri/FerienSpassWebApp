@@ -1,0 +1,88 @@
+﻿@page "/admin/systemeinstellungen"
+
+@using FerienspassWebApp.Models
+@using FerienspassWebApp.Data
+@using Microsoft.EntityFrameworkCore
+
+@inject ApplicationDbContext Db
+
+@attribute [Authorize(Roles = "Admin")]
+
+<h3>System Einstellungen</h3>
+
+    <div style="display:flex; flex-direction:column; gap:10px; max-width:400px;">
+
+        <h4>Kursleiter Phase</h4>
+
+        <input type="datetime-local"
+               value="@kursleiterStartText?.ToString("yyyy-MM-ddTHH:mm")"
+               @onchange="e => kursleiterStartText = ParseDate(e.Value?.ToString())" />
+
+        <input type="datetime-local"
+               value="@kursleiterEndeText?.ToString("yyyy-MM-ddTHH:mm")"
+               @onchange="e => kursleiterEndeText = ParseDate(e.Value?.ToString())" />
+
+        <hr />
+
+        <input type="datetime-local"
+               value="@anmeldungStartText?.ToString("yyyy-MM-ddTHH:mm")"
+               @onchange="e => anmeldungStartText = ParseDate(e.Value?.ToString())" />
+
+        <input type="datetime-local"
+               value="@anmeldungEndeText?.ToString("yyyy-MM-ddTHH:mm")"
+               @onchange="e => anmeldungEndeText = ParseDate(e.Value?.ToString())" />
+
+        <button class="btn btn-primary"
+                @onclick="Save">
+
+            Speichern
+        </button>
+
+        <p>@msg</p>
+
+    </div>
+
+@code {
+
+    private SystemSettings settings = new();
+
+    private string? msg;
+
+    private DateTime? kursleiterStartText;
+    private DateTime? kursleiterEndeText;
+
+    private DateTime? anmeldungStartText;
+    private DateTime? anmeldungEndeText;
+
+    private static DateTime? ParseDate(string? value)
+    {
+        if (DateTime.TryParse(value, out var dt))
+            return dt;
+
+        return null;
+    }
+    protected override async Task OnInitializedAsync()
+    {
+        settings = await Db.SystemSettings.FirstOrDefaultAsync();
+
+        if (settings == null)
+        {
+            settings = new SystemSettings();
+            Db.SystemSettings.Add(settings);
+            await Db.SaveChangesAsync();
+        }
+
+    }
+
+    async Task Save()
+    {
+        settings.KursleiterStart = kursleiterStartText;
+        settings.KursleiterEnde = kursleiterEndeText;
+
+        settings.AnmeldungStart = anmeldungStartText;
+        settings.AnmeldungEnde = anmeldungEndeText;
+
+        await Db.SaveChangesAsync();
+        msg = "Gespeichert!";
+    }
+}

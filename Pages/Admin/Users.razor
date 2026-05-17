@@ -1,0 +1,97 @@
+﻿@page "/admin/users"
+@attribute [Authorize(Roles = "Admin")]
+
+@using Microsoft.AspNetCore.Identity
+@using FerienspassWebApp.Models
+@inject UserManager<ApplicationUser> UserManager
+
+<h3>Admin - Benutzerverwaltung</h3>
+
+@if (users == null)
+{
+    <p>Loading...</p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Email</th>
+                <th>Rollen</th>
+                <th>Aktionen</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var user in users)
+            {
+                <tr>
+                    <td>@user.Email</td>
+                    <td>@string.Join(", ", userRoles.ContainsKey(user.Id)
+                        ? userRoles[user.Id]
+                        : new List<string>())
+                    </td>
+                    <td>
+                        <button class="btn btn-sm btn-primary"
+                                @onclick="() => MakeAdmin(user)">
+                            Admin
+                        </button>
+
+                        <button class="btn btn-sm btn-secondary"
+                                @onclick="() => MakeInstructor(user)">
+                            Kursleiter
+                        </button>
+
+                        <button class="btn btn-sm btn-warning"
+                                @onclick="() => MakeParent(user)">
+                            Eltern
+                        </button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    List<ApplicationUser>? users;
+    Dictionary<string, IList<string>> userRoles = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        users = UserManager.Users.ToList();
+
+        foreach (var user in users)
+        {
+            userRoles[user.Id] = await UserManager.GetRolesAsync(user);
+        }
+    }
+
+    async Task MakeAdmin(ApplicationUser user)
+    {
+        await SetRole(user, "Admin");
+    }
+
+    async Task MakeParent(ApplicationUser user)
+    {
+        await SetRole(user, "Eltern");
+    }
+
+    async Task MakeInstructor(ApplicationUser user)
+    {
+        await SetRole(user, "Kursleiter");
+    }
+
+    async Task SetRole(ApplicationUser user, string role)
+    {
+        var roles = await UserManager.GetRolesAsync(user);
+
+        foreach (var r in roles)
+        {
+            await UserManager.RemoveFromRoleAsync(user, r);
+        }
+
+        await UserManager.AddToRoleAsync(user, role);
+
+        await OnInitializedAsync();
+    }
+}

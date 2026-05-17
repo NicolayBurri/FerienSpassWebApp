@@ -1,0 +1,50 @@
+﻿@page "/kursleiter/events"
+
+@using FerienspassWebApp.Data
+@using FerienspassWebApp.Models
+@inject ApplicationDbContext Db
+@inject NavigationManager Nav
+
+<h3>Event Verwaltung</h3>
+
+@foreach (var ev in events)
+{
+    <div style="border:1px solid #ccc; padding:10px; margin-bottom:10px;">
+        <b>@ev.Eventname</b><br />
+        @ev.StartZeit?.ToString("dd.MM.yyyy HH:mm") -
+        @ev.EndeZeit?.ToString("dd.MM.yyyy HH:mm")<br />
+
+        <span>Ort: @ev.Location</span><br />
+        <span>Teilnehmer: @GetCount(ev.Id)</span><br />
+
+        <button @onclick="() => GoDetails(ev.Id)">Details</button>
+        <button @onclick="() => GoEdit(ev.Id)">Bearbeiten</button>
+    </div>
+}
+
+@code {
+    private List<Event> events = new();
+
+    protected override void OnInitialized()
+    {
+        events = Db.Events
+            .Where(x => !x.IsDeleted)
+            .OrderByDescending(x => x.StartZeit)
+            .ToList();
+    }
+
+    int GetCount(int eventId)
+    {
+        return Db.EventChildren.Count(x => x.EventId == eventId);
+    }
+
+    void GoDetails(int id)
+    {
+        Nav.NavigateTo($"/kursleiter/events/{id}");
+    }
+
+    void GoEdit(int id)
+    {
+        Nav.NavigateTo($"/kursleiter/events/edit/{id}");
+    }
+}

@@ -1,0 +1,35 @@
+﻿.popup-backdrop {
+    position: fixed;
+    inset: 0; /* ersetzt top/left/right/bottom */
+
+    background: rgba(0, 0, 0, 0.55); /* dunkler, aber weich */
+
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+    backdrop-filter: blur(3px); 
+}
+
+.popup-box {
+    background: white;
+    padding: 25px;
+    border-radius: 12px;
+    width: 380px;
+    text-align: center;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+    animation: popIn 0.2s ease-out;
+}
+
+/* kleine Animation */
+@keyframes popIn {
+    from {
+        transform: scale(0.9);
+        opacity: 0;
+    }
+
+    to {
+        transform: scale(1);
+        opacity: 1;
+    }
+}

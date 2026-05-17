@@ -1,0 +1,98 @@
+﻿@page "/user/rechnungen"
+
+@using Microsoft.EntityFrameworkCore
+@using FerienspassWebApp.Models
+@using FerienspassWebApp.Data
+
+@inject ApplicationDbContext Db
+@inject AuthenticationStateProvider AuthStateProvider
+
+<h3>Meine Rechnungen</h3>
+
+@if (!invoices.Any())
+{
+    <p>Keine Rechnungen vorhanden.</p>
+}
+else
+{
+    @foreach (var invoice in invoices)
+    {
+        <div style="border:1px solid #ccc; padding:15px; margin-bottom:10px; border-radius:10px;">
+
+            <h4>Rechnung @invoice.Reference</h4>
+
+            <p>
+                Datum:
+                @invoice.CreatedAt.ToString("dd.MM.yyyy")
+            </p>
+
+            <p>
+                Total:
+                CHF @invoice.TotalAmount
+            </p>
+
+            <p>
+                Status:
+                <span style="color:@GetColor(invoice.Status)">
+                    @GetText(invoice.Status)
+                </span>
+            </p>
+
+            @if (invoice.Status == InvoiceStatus.Paid)
+            {
+                <p>
+                    Bezahlt am:
+                    @invoice.PaidAt?.ToString("dd.MM.yyyy")
+                </p>
+            }
+
+            <a class="btn btn-primary"
+               href="@($"/rechnungen/rechnung_{invoice.Id}.pdf")"
+               target="_blank">
+                PDF öffnen
+            </a>
+
+        </div>
+    }
+}
+
+@code {
+
+    private List<Invoice> invoices = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var auth = await AuthStateProvider.GetAuthenticationStateAsync();
+
+        var userId = auth.User
+            .FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)
+            ?.Value;
+
+        invoices = Db.Invoices
+            .Where(x => x.ParentUserId == userId)
+            .OrderByDescending(x => x.CreatedAt)
+            .ToList();
+    }
+
+    string GetColor(InvoiceStatus status)
+    {
+        return status switch
+        {
+            InvoiceStatus.Open => "orange",
+            InvoiceStatus.Reminder => "red",
+            InvoiceStatus.Paid => "green",
+            _ => "black"
+        };
+    }
+
+    string GetText(InvoiceStatus status)
+    {
+        return status switch
+        {
+            InvoiceStatus.Open => "Offen",
+            InvoiceStatus.Reminder => "Mahnung",
+            InvoiceStatus.Paid => "Bezahlt",
+            _ => "-"
+        };
+    }
+}

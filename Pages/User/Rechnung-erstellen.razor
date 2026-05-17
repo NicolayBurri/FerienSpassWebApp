@@ -1,0 +1,340 @@
+﻿@page "/user/rechnung-erstellen"
+
+@using Microsoft.EntityFrameworkCore
+@using Codecrete.SwissQRBill.Generator
+@using PdfSharpCore.Pdf
+@using PdfSharpCore.Drawing
+@using FerienspassWebApp.Models
+@using FerienspassWebApp.Data
+@using SkiaSharp
+@using Svg.Skia
+@using System.IO
+
+@inject ApplicationDbContext Db
+@inject AuthenticationStateProvider AuthStateProvider
+@inject IWebHostEnvironment Env
+
+<h3>Rechnung Erstellen</h3>
+
+@if (isLoading)
+{
+    <p>Lade...</p>
+}
+else if (!items.Any())
+{
+    <p>Keine offenen Buchungen vorhanden, Rechnungen wurden schon erstellt.</p>
+}
+else
+{
+    <h4>Offene Positionen</h4>
+
+    <ul>
+        @foreach (var i in items)
+        {
+            <li>
+                @i.Child.Name - @i.Event.Eventname - CHF @i.Event.price
+            </li>
+        }
+    </ul>
+
+    <hr />
+
+    <h3>Total: CHF @total</h3>
+
+    <button class="btn btn-primary" @onclick="CreateInvoice">
+        Rechnung erstellen
+    </button>
+
+    <hr />
+
+    <h4>QR Rechnung</h4>
+
+    <p><b>Referenz:</b> @referenceNumber</p>
+    <p><b>Total:</b> CHF @total</p>
+
+    @if (!string.IsNullOrEmpty(qrSvg))
+    {
+        <div>
+            @((MarkupString)qrSvg)
+        </div>
+        <a class="btn btn-primary" href="@($"/rechnungen/{pdfFileName}")" target="_blank">
+            PDF herunterladen
+        </a>
+
+        <hr />
+
+        <h4>TWINT</h4>
+
+        <a class="btn btn-success"
+           href="https://pay.raisenow.io/fgyzv?lng=en"
+           target="_blank">
+            Direkt bezahlen
+        </a>
+    }
+
+    
+}
+
+@code {
+    private string? userId;
+    private List<EventChild> items = new();
+    private decimal total;
+    private bool isLoading = true;
+
+    private string? referenceNumber;
+    private string? pdfFileName;
+    private string? qrSvg;
+
+    private const string IBAN = "CH9206450600189814504";
+    private const string CreditorName = "Ferienspass Rohrbach";
+    private const string CreditorStreet = "Auswil und Rohrbachgraben";
+    private const string CreditorCity = "4938 Rohrbach";
+
+    protected override async Task OnInitializedAsync()
+    {
+        var auth = await AuthStateProvider.GetAuthenticationStateAsync();
+        userId = auth.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+
+        items = await Db.EventChildren
+            .Include(x => x.Event)
+            .Include(x => x.Child)
+            .Where(x =>
+                x.Child.ParentUserId == userId &&
+                !x.IsInvoiced &&
+                x.Status == EnrollmentStatus.Confirmed)
+            .ToListAsync();
+
+        total = items.Sum(x => (decimal)(x.Event.price ?? 0));
+
+        isLoading = false;
+    }
+
+    async Task CreateInvoice()
+    {
+        using var transaction = await Db.Database.BeginTransactionAsync();
+
+        try
+        {
+            referenceNumber = GenerateISO11649(userId!);
+
+            var invoice = new Invoice
+                {
+                    ParentUserId = userId!,
+                    Reference = referenceNumber!,
+                    TotalAmount = total,
+                    CreatedAt = DateTime.Now
+                };
+
+            Db.Invoices.Add(invoice);
+
+            // 🔥 WICHTIG: FIRST SAVE
+            await Db.SaveChangesAsync(); // <- HIER MUSS ES SEIN
+
+            foreach (var item in items)
+            {
+                item.IsInvoiced = true;
+
+                Db.InvoiceItems.Add(new InvoiceItem
+                    {
+                        InvoiceId = invoice.Id, // ✅ jetzt korrekt
+                        EventId = item.EventId,
+                        ChildId = item.ChildId,
+                        Price = item.Event.price ?? 0
+                    });
+            }
+
+            await Db.SaveChangesAsync();
+
+            await transaction.CommitAsync();
+
+            await GeneratePdf(invoice);
+
+            StateHasChanged();
+        }
+        catch
+        {
+            await transaction.RollbackAsync();
+        }
+    }
+
+    async Task GeneratePdf(Invoice invoice)
+    {
+        const int marginLeft = 40;
+        const int marginTop = 40;
+
+        var user = await Db.Users
+            .FirstOrDefaultAsync(x => x.Id == userId);
+
+
+        // Aufsetzen von Rechnungsdaten
+        Bill bill = new Bill
+            {
+                // Kreditor Daten
+                Account = IBAN,
+                Creditor = new Address
+                {
+                    Name = CreditorName,
+                    AddressLine1 = CreditorStreet,
+                    AddressLine2 = CreditorCity,
+                    CountryCode = "CH"
+                },
+
+                //Zahlungsdaten
+                Amount = total,
+                Currency = "CHF",
+
+                //Debitor Daten
+                Debtor = new Address
+                {
+                    Name = $"Familie {user.Nachname} ",
+                    AddressLine1 = user.Strasse,
+                    AddressLine2 = $"{user.PLZ} {user.Ort}",
+                    CountryCode = "CH"
+                },
+
+                //Referenzen
+                Reference = invoice.Reference
+            };
+
+        byte[] svg = QRBill.Generate(bill);
+
+        qrSvg = System.Text.Encoding.UTF8.GetString(svg);
+
+        // SVG -> PNG
+        byte[] png = ConvertSvgToPng(svg);
+
+        //PDF Erstellen
+        using var document = new PdfDocument();
+
+        var page = document.AddPage();
+
+        // A4 Format
+        page.Width = XUnit.FromMillimeter(210);
+        page.Height = XUnit.FromMillimeter(297);
+
+        using var gfx = XGraphics.FromPdfPage(page);
+
+        using var ms = new MemoryStream(png);
+
+        var image = XImage.FromStream(() => ms);
+
+        // Ganzes PDF füllen
+        var titleFont = new XFont("Arial", 20);
+        var textFont = new XFont("Arial", 12);
+
+        gfx.DrawString(
+            "FerienSpass Rohrbach",
+            titleFont,
+            XBrushes.Black,
+            new XRect(marginLeft, marginTop, page.Width, 30),
+            XStringFormats.TopLeft);
+
+        int y = marginTop + 60;
+
+        foreach(var item in items)
+        {
+            gfx.DrawString(
+                $"{item.Child.Name} - {item.Event.Eventname} - CHF {item.Event.price}",
+                textFont,
+                XBrushes.Black,
+                new XRect(marginLeft, y, page.Width, 20),
+                XStringFormats.TopLeft);
+
+            y += 25;
+        }
+
+        y += 20;
+
+        gfx.DrawString(
+                $"Total: CHF{total}",
+                textFont,
+                XBrushes.Black,
+                new XRect(marginLeft, y, page.Width, 30),
+                XStringFormats.TopLeft);
+
+        gfx.DrawImage(
+            image,
+            0,
+            page.Height - 350,
+            500,
+            320);
+
+        // Ordner erstellen falls nicht vorhanden
+        var folder = Path.Combine(Env.WebRootPath, "rechnungen");
+
+        if (!Directory.Exists(folder))
+            Directory.CreateDirectory(folder);
+
+        // Dateiname
+        pdfFileName = $"rechnung_{invoice.Id}.pdf";
+
+        var path = Path.Combine(folder, pdfFileName);
+
+        // PDF speichern
+        document.Save(path);
+    }
+
+    string GenerateISO11649(string input)
+    {
+        var cleaned = new string(input.ToUpper()
+            .Where(char.IsLetterOrDigit)
+            .ToArray());
+
+        cleaned = cleaned.Length > 21 ? cleaned[..21] : cleaned;
+
+        var rearranged = cleaned + "RF00";
+
+        var numeric = "";
+
+        foreach (var c in rearranged)
+        {
+            if (char.IsDigit(c))
+                numeric += c;
+            else
+                numeric += (c - 'A' + 10).ToString();
+        }
+
+        int mod = Mod97(numeric);
+        int checkDigits = 98 - mod;
+
+        return $"RF{checkDigits:00}{cleaned}";
+    }
+
+    int Mod97(string number)
+    {
+        int remainder = 0;
+
+        foreach (char c in number)
+        {
+            remainder = (remainder * 10 + (c - '0')) % 97;
+        }
+
+        return remainder;
+    }
+
+    byte[] ConvertSvgToPng(byte[] svgData)
+    {
+        using var svg = new Svg.Skia.SKSvg();
+
+        svg.Load(new MemoryStream(svgData));
+
+        var picture = svg.Picture;
+
+        var width = (int)picture.CullRect.Width;
+        var height = (int)picture.CullRect.Height;
+
+        using var bitmap = new SKBitmap(width, height);
+
+        using var canvas = new SKCanvas(bitmap);
+
+        canvas.Clear(SKColors.White);
+
+        canvas.DrawPicture(picture);
+
+        using var image = SKImage.FromBitmap(bitmap);
+
+        using var data = image.Encode(SKEncodedImageFormat.Png, 100);
+
+        return data.ToArray();
+    }
+}

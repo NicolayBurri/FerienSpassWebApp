@@ -1,0 +1,368 @@
+﻿@page "/user/children"
+
+@attribute [Authorize]
+
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
+
+@using FerienspassWebApp.Models
+@using FerienspassWebApp.Data
+
+@inject UserManager<ApplicationUser> UserManager
+@inject AuthenticationStateProvider AuthStateProvider
+@inject ApplicationDbContext Db
+
+<h3>Schülerdaten</h3>
+
+@if (isLoading)
+{
+    <p>Lade...</p>
+}
+else
+{
+    <div style="max-width:700px;">
+
+        <input placeholder="Name"
+               @bind="newChild.Name" />
+
+        <br /><br />
+
+        <input placeholder="Alter"
+               type="number"
+               @bind="newChild.Alter" />
+
+        <br /><br />
+
+        <select @bind="newChild.Klasse">
+            @foreach (var k in Enum.GetValues<KlasseStufe>())
+            {
+                <option value="@k">@GetKlasseText(k)</option>
+            }
+        </select>
+
+        <br /><br />
+
+        <input placeholder="Allergien"
+               @bind="newChild.Allergien" />
+
+        <br /><br />
+
+        <input placeholder="Besonderes"
+               @bind="newChild.Besonderes" />
+
+        <br /><br />
+
+        <button class="btn btn-primary"
+                @onclick="AddChild"
+                disabled="@isSaving">
+
+            @(isSaving ? "Speichert..." : "Hinzufügen")
+
+        </button>
+
+        <hr />
+
+        @if (!myChildren.Any())
+        {
+            <p>Keine Kinder vorhanden.</p>
+        }
+
+        @foreach (var child in myChildren)
+        {
+            <div style="
+                width:100%;
+                margin-bottom:15px;
+                border:1px solid #ccc;
+                padding:15px;
+                border-radius:10px;
+                display:flex;
+                flex-direction:column;
+                gap:10px;
+                    ">
+
+                @if (editChild?.Id == child.Id)
+                {
+                    <input style="width:100%; padding:8px; box-sizing:border-box;"
+                           @bind="editChild.Name" />
+
+                    <input style="width:100%; padding:8px; box-sizing:border-box;"
+                           type="number"
+                           @bind="editChild.Alter" />
+
+                    <select style="width:100%; padding:8px; box-sizing:border-box;"
+                            @bind="editChild.Klasse">
+                        @foreach (var k in Enum.GetValues<KlasseStufe>())
+                        {
+                            <option value="@k">@GetKlasseText(k)</option>
+                        }
+                    </select>
+
+                    <input style="width:100%; padding:8px; box-sizing:border-box;"
+                           @bind="editChild.Allergien" />
+
+                    <input style="width:100%; padding:8px; box-sizing:border-box;"
+                           @bind="editChild.Besonderes" />
+
+                    <button class="btn btn-success"
+                            @onclick="SaveChild"
+                            disabled="@isSaving">
+                        Speichern
+                    </button>
+
+                    <button class="btn btn-secondary"
+                            @onclick="CancelEdit">
+                        Abbrechen
+                    </button>
+                }
+                else
+                {
+                    <div style="display:flex; flex-direction:column; gap:6px;">
+
+                        <b>@child.Name</b>
+
+                        <span>@child.Alter Jahre</span>
+
+                        <span>Klasse: @GetKlasseText(child.Klasse)</span>
+
+                        @if (!string.IsNullOrWhiteSpace(child.Allergien))
+                        {
+                            <span>Allergien: @child.Allergien</span>
+                        }
+
+                        @if (!string.IsNullOrWhiteSpace(child.Besonderes))
+                        {
+                            <span>Besonderes: @child.Besonderes</span>
+                        }
+
+                        <div style="display:flex; gap:10px;">
+                            <button class="btn btn-warning"
+                                    @onclick="() => StartEdit(child)">
+                                Bearbeiten
+                            </button>
+
+                            <button class="btn btn-danger"
+                                    @onclick="() => DeleteChild(child.Id)"
+                                    disabled="@isSaving">
+                                Löschen
+                            </button>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+
+    </div>
+}
+
+@code {
+
+    private List<Child> myChildren = new();
+
+    private Child newChild = new();
+
+    private Child? editChild;
+
+    private Child? backupChild;
+
+    private string userId = "";
+
+    private bool isLoading = true;
+
+    private bool isSaving = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var authState =
+                await AuthStateProvider.GetAuthenticationStateAsync();
+
+            var user = authState.User;
+
+            userId = UserManager.GetUserId(user);
+
+            await LoadChildren();
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    async Task LoadChildren()
+    {
+        myChildren = await Db.Children
+            .Where(c => c.ParentUserId == userId)
+            .OrderBy(c => c.Name)
+            .AsNoTracking()
+            .ToListAsync();
+    }
+
+    void StartEdit(Child child)
+    {
+        editChild = new Child
+            {
+                Id = child.Id,
+                Name = child.Name,
+                Alter = child.Alter,
+                Klasse = child.Klasse,
+                Allergien = child.Allergien,
+                Besonderes = child.Besonderes,
+                ParentUserId = child.ParentUserId
+            };
+
+        backupChild = new Child
+            {
+                Id = child.Id,
+                Name = child.Name,
+                Alter = child.Alter,
+                Klasse = child.Klasse,
+                Allergien = child.Allergien,
+                Besonderes = child.Besonderes,
+                ParentUserId = child.ParentUserId
+            };
+    }
+
+    void CancelEdit()
+    {
+        editChild = null;
+        backupChild = null;
+    }
+
+    async Task AddChild()
+    {
+        if (isSaving)
+            return;
+
+        if (string.IsNullOrWhiteSpace(newChild.Name))
+            return;
+
+        isSaving = true;
+
+        try
+        {
+            newChild.ParentUserId = userId;
+
+            Db.Children.Add(newChild);
+
+            await Db.SaveChangesAsync();
+
+            newChild = new Child();
+
+            await LoadChildren();
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    async Task DeleteChild(int childId)
+    {
+        if (isSaving)
+            return;
+
+        isSaving = true;
+
+        try
+        {
+            // Sicherheitsprüfung:
+            // Nur eigenes Kind löschen
+
+            var child = await Db.Children
+                .FirstOrDefaultAsync(x =>
+                    x.Id == childId &&
+                    x.ParentUserId == userId);
+
+            if (child == null)
+                return;
+
+            // Prüfen ob Anmeldungen existieren
+
+            bool hasRegistrations =
+                await Db.EventChildren.AnyAsync(x =>
+                    x.ChildId == child.Id);
+
+            if (hasRegistrations)
+            {
+                // Optional:
+                // statt löschen -> deaktivieren
+
+                return;
+            }
+
+            Db.Children.Remove(child);
+
+            await Db.SaveChangesAsync();
+
+            await LoadChildren();
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    async Task SaveChild()
+    {
+        if (editChild == null)
+            return;
+
+        if (isSaving)
+            return;
+
+        isSaving = true;
+
+        try
+        {
+            // Sicherheitsprüfung:
+            // Nur eigenes Kind bearbeiten
+
+            var child = await Db.Children
+                .FirstOrDefaultAsync(x =>
+                    x.Id == editChild.Id &&
+                    x.ParentUserId == userId);
+
+            if (child == null)
+                return;
+
+            child.Name = editChild.Name;
+            child.Alter = editChild.Alter;
+            child.Klasse = editChild.Klasse;
+            child.Allergien = editChild.Allergien;
+            child.Besonderes = editChild.Besonderes;
+
+            await Db.SaveChangesAsync();
+
+            editChild = null;
+
+            backupChild = null;
+
+            await LoadChildren();
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    string GetKlasseText(KlasseStufe k)
+    {
+        return k switch
+        {
+            KlasseStufe.KiGa1 => "1. Kindergarten",
+            KlasseStufe.KiGa2 => "2. Kindergarten",
+            KlasseStufe.Klasse1 => "1. Klasse",
+            KlasseStufe.Klasse2 => "2. Klasse",
+            KlasseStufe.Klasse3 => "3. Klasse",
+            KlasseStufe.Klasse4 => "4. Klasse",
+            KlasseStufe.Klasse5 => "5. Klasse",
+            KlasseStufe.Klasse6 => "6. Klasse",
+            KlasseStufe.Klasse7 => "7. Klasse",
+            KlasseStufe.Klasse8 => "8. Klasse",
+            KlasseStufe.Klasse9 => "9. Klasse",
+            _ => k.ToString()
+        };
+    }
+}

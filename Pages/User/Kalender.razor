@@ -1,0 +1,352 @@
+﻿@page "/user/Kalender"
+
+@inject ApplicationDbContext Db
+@inject NavigationManager Nav
+@inject AuthenticationStateProvider AuthStateProvider
+@inject IJSRuntime JS
+
+@using FerienspassWebApp.Data
+@using FerienspassWebApp.Models
+@using Microsoft.EntityFrameworkCore
+@using ClosedXML.Excel
+@using System.IO
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+
+<PageTitle>Event Kalender</PageTitle>
+
+<h3>Event Kalender</h3>
+
+@if (isLoading)
+{
+    <p>Lade...</p>
+}
+else
+{
+    <AuthorizeView Roles="Admin,Kursleiter">
+        <Authorized>
+
+            <button class="btn btn-success"
+                    @onclick="ExportEventsExcel">
+                Events als Excel exportieren
+            </button>
+
+            <br />
+            <br />
+
+        </Authorized>
+    </AuthorizeView>
+
+    <select value="@selectedKategorie"
+        @onchange="OnKategorieChanged">
+        <option value="">Alle Kategorien</option>
+        <option value="@EventKategorie.Tier">Tiere</option>
+        <option value="@EventKategorie.Food">Essen</option>
+        <option value="@EventKategorie.Erlebnis">Erlebnis</option>
+        <option value="@EventKategorie.Kreativ">Kreativ</option>
+        <option value="@EventKategorie.Sport">Sport</option>
+        <option value="@EventKategorie.Vaki">Vaki</option>
+        <option value="@EventKategorie.Allgemein">Allgemein</option>
+    </select>
+
+    <input type="number" value="@filterAlter" @oninput="OnAlterChanged" />
+
+    @foreach (var group in eventsByDay)
+    {
+        <h4>@group.Key.ToString("dddd dd.MM")</h4>
+
+        @foreach (var ev in group.Value)
+        {
+            <div style="border:1px solid #ccc; padding:8px; margin-bottom:5px;">
+
+                <b>@ev.Eventname</b><br />
+                @ev.StartZeit?.ToString("HH:mm") - @ev.EndeZeit?.ToString("HH:mm")<br />
+
+                @if (ev.IsFull)
+                {
+                    <span style="color:red">AUSGEBUCHT</span>
+                }
+
+                <br />
+
+                <h4>Kursleiter</h4>
+
+                @if (ev?.Kursleiter?.Any() == true)
+                {
+                    @foreach (var kl in ev.Kursleiter)
+                    {
+                        <p>@kl.User?.Vorname @kl.User?.Nachname</p>
+                    }
+                }
+
+                <button @onclick="() => GoToEvent(ev.Id)"
+                        disabled="@ev.IsFull">
+                    @(ev.IsFull ? "Ausgebucht" : "Anmelden")
+                </button>
+
+                @if (myRegsByEvent.TryGetValue(ev.Id, out var myRegs) && myRegs.Any())
+                {
+                    <div style="margin-top:8px;">
+                        <b>Meine Kinder:</b>
+
+                        <ul>
+                            @foreach (var r in myRegs)
+                            {
+                                <li>
+                                    @r.Child.Name -
+
+                                    @if (r.Status == EnrollmentStatus.Confirmed)
+                                    {
+                                        <span style="color:green">Bestätigt</span>
+                                    }
+                                    else
+                                    {
+                                        <span style="color:orange">Warteliste</span>
+                                    }
+
+                                    <button @onclick="() => UnregisterChild(ev.Id, r.ChildId)">
+                                        Abmelden
+                                    </button>
+                                </li>
+                            }
+                        </ul>
+                    </div>
+                }
+            </div>
+        }
+    }
+}
+
+@code {
+
+    private bool isLoading = true;
+
+    private List<Event> events = new();
+    private Dictionary<DateTime, List<Event>> eventsByDay = new();
+
+    private EventKategorie? selectedKategorie;
+    private int? filterAlter;
+
+    private Dictionary<int, List<EventChild>> myRegsByEvent = new();
+
+    private string? userId;
+    private List<int> myChildIds = new();
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+
+            userId = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+
+            if (string.IsNullOrEmpty(userId))
+                return;
+
+            // nur eigene Kinder
+            myChildIds = await Db.Children
+                .AsNoTracking()
+                .Where(c => c.ParentUserId == userId)
+                .Select(c => c.Id)
+                .ToListAsync();
+
+            await LoadEvents();
+            await LoadMyRegistrations();
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task LoadEvents()
+    {
+        var query = Db.Events
+            .Include(x=> x.Kursleiter)
+            .ThenInclude(x => x.User)
+            .AsNoTracking()
+            .Where(x => !x.IsDeleted)
+            .Where(x => x.StartZeit >= DateTime.Now);
+
+        // Kategorie Filter
+        if (selectedKategorie.HasValue)
+        {
+            query = query.Where(x => x.Kategorie == selectedKategorie);
+        }
+
+        // Alter Filter
+        if (filterAlter.HasValue)
+        {
+            query = query.Where(x =>
+                (!x.AlterMin.HasValue || x.AlterMin <= filterAlter) &&
+                (!x.AlterMax.HasValue || x.AlterMax >= filterAlter));
+        }
+
+        events = await query
+            .OrderBy(x => x.StartZeit)
+            .ToListAsync();
+
+        eventsByDay = events
+            .Where(x => x.StartZeit.HasValue)
+            .GroupBy(x => x.StartZeit.Value.Date)
+            .ToDictionary(g => g.Key, g => g.ToList());
+    }
+
+    private async Task LoadMyRegistrations()
+    {
+        var allRegs = await Db.EventChildren
+            .AsNoTracking()
+            .Include(x => x.Child)
+            .Where(x => myChildIds.Contains(x.ChildId))
+            .ToListAsync();
+
+        myRegsByEvent = allRegs
+            .GroupBy(x => x.EventId)
+            .ToDictionary(g => g.Key, g => g.ToList());
+    }
+
+    void GoToEvent(int id)
+    {
+        Nav.NavigateTo($"/user/anmelden/{id}");
+    }
+
+    async Task UnregisterChild(int eventId, int childId)
+    {
+        var entry = await Db.EventChildren
+            .FirstOrDefaultAsync(x =>
+                x.EventId == eventId &&
+                x.ChildId == childId);
+
+        if (entry == null)
+            return;
+
+        Db.EventChildren.Remove(entry);
+        await Db.SaveChangesAsync();
+
+        await PromoteWaitingList(eventId);
+        await LoadMyRegistrations();
+    }
+
+    async Task PromoteWaitingList(int eventId)
+    {
+        var ev = await Db.Events
+            .FirstAsync(x => x.Id == eventId);
+
+        var confirmedCount = await Db.EventChildren
+            .CountAsync(x =>
+                x.EventId == eventId &&
+                x.Status == EnrollmentStatus.Confirmed);
+
+        var waiting = await Db.EventChildren
+            .Where(x =>
+                x.EventId == eventId &&
+                x.Status == EnrollmentStatus.WaitingList)
+            .OrderBy(x => x.RegisteredAt)
+            .ToListAsync();
+
+        int freeSlots = ev.MaxKinder - confirmedCount;
+
+        if (freeSlots <= 0)
+            return;
+
+        foreach (var entry in waiting.Take(freeSlots))
+        {
+            entry.Status = EnrollmentStatus.Confirmed;
+        }
+
+        await Db.SaveChangesAsync();
+    }
+
+    private async Task OnKategorieChanged(ChangeEventArgs e)
+    {
+        selectedKategorie = string.IsNullOrEmpty(e.Value?.ToString())
+            ? null
+            : Enum.Parse<EventKategorie>(e.Value!.ToString()!);
+
+        await LoadEvents();
+    }
+
+    private async Task OnAlterChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var val))
+            filterAlter = val;
+        else
+            filterAlter = null;
+
+        await LoadEvents();
+    }
+
+    async Task ExportEventsExcel()
+    {
+        var currentYear = DateTime.Now.Year;
+
+        var allEvents = await Db.Events
+            .Include(x => x.Kursleiter)
+                .ThenInclude(x => x.User)
+            .Where(x => x.StartZeit.HasValue &&
+                        x.StartZeit.Value.Year == currentYear)
+            .OrderBy(x => x.StartZeit)
+            .ToListAsync();
+
+        using var workbook = new XLWorkbook();
+
+        var ws = workbook.AddWorksheet("Events");
+
+        //Header
+        ws.Cell(1, 1).Value = "Datum";
+        ws.Cell(1, 2).Value = "Start";
+        ws.Cell(1, 3).Value = "Ende";
+        ws.Cell(1, 4).Value = "Event";
+        ws.Cell(1, 5).Value = "Kategorie";
+        ws.Cell(1, 6).Value = "Ort";
+        ws.Cell(1, 7).Value = "Kursleiter";
+
+        int row = 2;
+
+        foreach (var ev in allEvents){
+            var kursleiterNames = ev.Kursleiter.Any()
+                ? string.Join(", ",
+                ev.Kursleiter
+                    .Select(k => k.User.Vorname))
+                : "-";
+
+            ws.Cell(row, 1).Value = ev.StartZeit?.ToString("dd.MM.yyyy");
+
+            ws.Cell(row, 2).Value = ev.StartZeit?.ToString("HH:mm");
+
+            ws.Cell(row, 3).Value = ev.EndeZeit?.ToString("HH:mm");
+
+            ws.Cell(row, 4).Value = ev.Eventname;
+
+            ws.Cell(row, 5).Value = ev.Kategorie.ToString();
+
+            ws.Cell(row, 6).Value = ev.Location;
+
+            ws.Cell(row, 7).Value = kursleiterNames;
+
+
+            row++;
+
+        }
+
+        ws.Columns().AdjustToContents();
+
+        using var stream = new MemoryStream();
+
+        workbook.SaveAs(stream);
+
+        stream.Position = 0;
+
+        using var streamRef = new DotNetStreamReference(stream);
+
+        await JS.InvokeVoidAsync(
+            "downloadFileFromStream",
+            "Events.xlsx",
+            streamRef
+        );
+
+        
+    }
+}

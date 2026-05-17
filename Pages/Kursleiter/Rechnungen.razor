@@ -1,0 +1,181 @@
+﻿@page "/kursleiter/rechnungen"
+
+@using Microsoft.EntityFrameworkCore
+@using FerienspassWebApp.Models
+@using FerienspassWebApp.Data
+
+@inject ApplicationDbContext Db
+
+<h3>Rechnungsverwaltung</h3>
+
+<div style="margin-bottom:20px;">
+
+    <input class="form-control"
+           placeholder="Referenznummer eingeben"
+           @bind="searchReference" />
+
+    <br />
+
+    <button class="btn btn-success"
+            @onclick="MarkAsPaid">
+        Als bezahlt markieren
+    </button>
+
+</div>
+
+<hr />
+
+@if (!invoices.Any())
+{
+    <p>Keine Rechnungen vorhanden.</p>
+}
+else
+{
+    <table class="table">
+
+        <thead>
+            <tr>
+                <th>Referenz</th>
+                <th>Familie</th>
+                <th>Email</th>
+                <th>Datum</th>
+                <th>Total</th>
+                <th>Status</th>
+                <th>Ändern</th>
+            </tr>
+        </thead>
+
+        <tbody>
+
+            @foreach (var invoice in invoices)
+            {
+                <tr>
+
+                    <td>@invoice.Reference</td>
+
+                    <td>
+                        @invoice.ParentUser.Nachname
+                    </td>
+
+                    <td>
+                        @invoice.ParentUser.Email
+                    </td>
+
+                    <td>
+                        @invoice.CreatedAt.ToString("dd.MM.yyyy")
+                    </td>
+
+                    <td>
+                        CHF @invoice.TotalAmount
+                    </td>
+
+                    <td>
+                        <span style="color:@GetColor(invoice.Status)">
+                            @GetText(invoice.Status)
+                        </span>
+                    </td>
+
+                    <td>
+
+                        <select class="form-select"
+                                value="@invoice.Status"
+                                @onchange="e => ChangeStatus(invoice, e.Value?.ToString())">
+
+                            <option value="Open">Offen</option>
+                            <option value="Reminder">Mahnung</option>
+                            <option value="Paid">Bezahlt</option>
+
+                        </select>
+
+                    </td>
+
+                </tr>
+            }
+
+        </tbody>
+
+    </table>
+}
+
+@code {
+
+    private List<Invoice> invoices = new();
+
+    private string? searchReference;
+
+    protected override void OnInitialized()
+    {
+        LoadInvoices();
+    }
+
+    void LoadInvoices()
+    {
+        invoices = Db.Invoices
+            .Include(x=>x.ParentUser)
+            .OrderByDescending(x => x.CreatedAt)
+            .ToList();
+    }
+
+    async Task MarkAsPaid()
+    {
+        if (string.IsNullOrWhiteSpace(searchReference))
+            return;
+
+        var invoice = Db.Invoices
+            .FirstOrDefault(x => x.Reference == searchReference);
+
+        if (invoice == null)
+            return;
+
+        invoice.Status = InvoiceStatus.Paid;
+        invoice.PaidAt = DateTime.Now;
+
+        await Db.SaveChangesAsync();
+
+        LoadInvoices();
+    }
+
+    async Task ChangeStatus(Invoice invoice, string? value)
+    {
+        if (value == null)
+            return;
+
+        invoice.Status = Enum.Parse<InvoiceStatus>(value);
+
+        if (invoice.Status == InvoiceStatus.Paid)
+        {
+            invoice.PaidAt = DateTime.Now;
+        }
+
+        if (invoice.Status == InvoiceStatus.Reminder)
+        {
+            invoice.ReminderSentAt = DateTime.Now;
+        }
+
+        await Db.SaveChangesAsync();
+
+        LoadInvoices();
+    }
+
+    string GetColor(InvoiceStatus status)
+    {
+        return status switch
+        {
+            InvoiceStatus.Open => "orange",
+            InvoiceStatus.Reminder => "red",
+            InvoiceStatus.Paid => "green",
+            _ => "black"
+        };
+    }
+
+    string GetText(InvoiceStatus status)
+    {
+        return status switch
+        {
+            InvoiceStatus.Open => "Offen",
+            InvoiceStatus.Reminder => "Mahnung",
+            InvoiceStatus.Paid => "Bezahlt",
+            _ => "-"
+        };
+    }
+}

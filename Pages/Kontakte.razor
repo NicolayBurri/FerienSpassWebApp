@@ -1,0 +1,46 @@
+﻿@page "/Kontakte"
+@using FerienspassWebApp.Services
+@inject DocxService DocxService
+@inject IWebHostEnvironment Env
+
+<PageTitle>Kontakte</PageTitle>
+
+<h1>Kontakte</h1>
+
+@if (Documents.Count == 0)
+{
+    <p> Die Kontaktliste wird gerade überarbeitet.</p>
+}
+else
+{
+    <p>Fragen oder Probleme? Zögert nicht uns zu Kontaktieren</p>
+
+    @foreach (var doc in Documents)
+    {
+        <SurveyPrompt Title="@doc.Title" Content="@doc.Html" />
+    }
+}
+
+
+@code {
+    private List<DocItem> Documents = new();
+
+    protected override void OnInitialized()
+    {
+        var folder = Path.Combine(Env.WebRootPath, "configsheets/Kontakte");
+
+        var files = Directory.GetFiles(folder, "*.docx");
+
+        Documents = files.Select(file => new DocItem
+            {
+                Title = Path.GetFileNameWithoutExtension(file),
+                Html = DocxService.ConvertToHtml(file)
+            }).ToList();
+    }
+
+    private class DocItem
+    {
+        public string Title { get; set; } = "";
+        public string Html { get; set; } = "";
+    }
+}

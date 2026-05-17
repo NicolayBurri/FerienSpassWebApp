@@ -1,0 +1,25 @@
+﻿@page "/"
+@namespace FerienspassWebApp.Pages
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@{
+    Layout = "_Layout";
+}
+
+<component type="typeof(App)" render-mode="ServerPrerendered" />
+
+<script>
+    window.downloadFileFromStream = async (fileName, contentStreamReference) => {
+        const arrayBuffer = await contentStreamReference.arrayBuffer();
+        const blob = new Blob([arrayBuffer]);
+        const url = URL.createObjectURL(blob);
+
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.download = fileName ?? '';
+        anchor.click();
+
+        anchor.remove();
+        URL.revokeObjectURL(url);
+    };
+</script>
+<link href="_content/BlazorCalendar/BlazorCalendar.css" rel="stylesheet" />

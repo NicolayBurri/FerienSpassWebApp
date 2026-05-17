@@ -1,0 +1,50 @@
+﻿@page "/Kalender"
+@inject ApplicationDbContext Db
+
+<PageTitle>Event Kalender</PageTitle>
+
+@using FerienspassWebApp.Data
+@using FerienspassWebApp.Models
+
+<h3>Event Kalender</h3>
+
+@foreach (var group in eventsByDay)
+{
+    <h4>@group.Key.ToString("dddd dd.MM")</h4>
+
+    @foreach(var ev in group.Value)
+    {
+        <div style="border:1px solid #ccc; padding:8px; margin-bottom:5px;">
+            <b>@ev.Eventname</b><br />
+            @ev.StartZeit?.ToString("HH:mm") - @ev.EndeZeit?.ToString("HH:mm")<br />
+
+            @if (ev.IsFull)
+            {
+                <span style="color:red">AUSGEBUCHT</span>
+            }
+        </div>
+    }
+}
+
+@code {
+    private List<Event> events = new();
+    private Dictionary<DateTime, List<Event>> eventsByDay = new();
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        {
+            events = Db.Events
+                .Where(x => !x.IsDeleted)
+                .Where(x => x.StartZeit >= DateTime.Now)
+                .OrderBy(x => x.StartZeit!.Value.Date)
+                .ToList();
+
+            eventsByDay = events
+                .Where(x => x.StartZeit.HasValue)
+                .GroupBy(x => x.StartZeit!.Value.Date)
+                .ToDictionary(g => g.Key, g => g.ToList());
+        }
+    }
+
+}

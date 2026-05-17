@@ -1,0 +1,46 @@
+﻿@page "/"
+@using FerienspassWebApp.Services
+@inject DocxService DocxService
+@inject IWebHostEnvironment Env
+
+<PageTitle>Index</PageTitle>
+
+<h1>Willkommen auf der Startseite von FerienSpass.</h1>
+
+@if (Documents.Count == 0)
+{
+    <p>Es sind noch keine Informationen vorhanden. Wir freuen uns, Sie bald mit aktuellen Informationen beliefern zu dürfen. Mit den besten Grüssen Ihr FerienSpass Team.</p>
+}
+else
+{
+    <p>Danke für Ihr interesse. Bitte entnehmen Sie die wichtigsten Informationen auf dieser Startseite.</p>
+
+    @foreach (var doc in Documents)
+    {
+        <SurveyPrompt Title="@doc.Title" Content="@doc.Html" />
+    }
+}
+
+
+@code {
+    private List<DocItem> Documents = new();
+
+    protected override void OnInitialized()
+    {
+        var folder = Path.Combine(Env.WebRootPath, "configsheets/Informationen");
+
+        var files = Directory.GetFiles(folder, "*.docx");
+
+        Documents = files.Select(file => new DocItem
+            {
+                Title = Path.GetFileNameWithoutExtension(file),
+                Html = DocxService.ConvertToHtml(file)
+            }).ToList();
+    }
+
+    private class DocItem
+    {
+        public string Title { get; set; } = "";
+        public string Html { get; set; } = "";
+    }
+}

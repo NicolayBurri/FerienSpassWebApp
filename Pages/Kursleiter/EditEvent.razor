@@ -1,0 +1,291 @@
+﻿@page "/kursleiter/events/edit/{eventId:int}"
+
+@using FerienspassWebApp.Data
+@using FerienspassWebApp.Models
+@using Microsoft.EntityFrameworkCore
+
+@inject ApplicationDbContext Db
+@inject NavigationManager Nav
+
+<h3>Event bearbeiten</h3>
+
+@if (ev == null)
+{
+    <p>Lade...</p>
+}
+else
+{
+    <div style="display:flex; flex-direction:column; gap:10px; max-width:600px;">
+
+        <input @bind="ev.Eventname" placeholder="Eventname" />
+
+        <select @bind="ev.Kategorie">
+            <option value="@EventKategorie.Tier">Tiere</option>
+            <option value="@EventKategorie.Food">Essen</option>
+            <option value="@EventKategorie.Erlebnis">Erlebnis</option>
+            <option value="@EventKategorie.Kreativ">Kreativ</option>
+            <option value="@EventKategorie.Sport">Sport</option>
+            <option value="@EventKategorie.Vaki">Vaki</option>
+            <option value="@EventKategorie.Allgemein">Allgemein</option>
+        </select>
+
+        <h4>Kursleiter</h4>
+
+        @foreach (var kl in kursleiter)
+        {
+            <div style="display:flex; gap:10px; align-items:center;">
+                <select @bind="kl.UserId">
+                    @foreach (var u in users)
+                    {
+                        <option value="@u.Id">
+                            @u.Vorname @u.Nachname
+                        </option>
+                    }
+                </select>
+
+                <button @onclick="() => RemoveKursleiter(kl)">
+                    Entfernen
+                </button>
+            </div>
+        }
+
+        <button @onclick="AddKursleiter">
+            + Kursleiter hinzufügen
+        </button>
+
+        <textarea @bind="ev.Beschreibung"
+                  placeholder="Beschreibung">
+            </textarea>
+
+        <input @bind="ev.Location"
+               placeholder="Ort" />
+
+        <input @bind="ev.Treffpunkt"
+               placeholder="Treffpunkt" />
+
+        <input type="number"
+               @bind="ev.price"
+               placeholder="Preis" />
+
+        <input type="number"
+               @bind="ev.MinKinder"
+               placeholder="Min Kinder" />
+
+        <input type="number"
+               @bind="ev.MaxKinder"
+               placeholder="Max Kinder" />
+
+        <input type="number"
+               @bind="ev.WaitlisteLimit"
+               placeholder="Warteliste Limit" />
+
+        <input type="number"
+               @bind="ev.AlterMin"
+               placeholder="Mindestalter" />
+
+        <input type="number"
+               @bind="ev.AlterMax"
+               placeholder="Maximalalter" />
+
+        <label>
+            <input type="checkbox"
+                   @bind="ev.BrauchtBetreuung" />
+            Braucht Betreuung
+        </label>
+
+        @if (ev.BrauchtBetreuung)
+        {
+            <input type="number"
+                   @bind="ev.AnzahlBetreuung"
+                   placeholder="Anzahl Betreuung" />
+        }
+
+        <label>
+            <input type="checkbox"
+                   @bind="ev.BrauchtFahrer" />
+            Braucht Fahrer
+        </label>
+
+        @if (ev.BrauchtFahrer)
+        {
+            <input type="number"
+                   @bind="ev.AnzahlSitzplaetze"
+                   placeholder="Benötigte Sitzplätze" />
+        }
+
+        <label>Start</label>
+
+        <input type="datetime-local"
+               value="@startText"
+               @onchange="e => startText = e.Value?.ToString()" />
+
+        <label>Ende</label>
+
+        <input type="datetime-local"
+               value="@endText"
+               @onchange="e => endText = e.Value?.ToString()" />
+
+        <input @bind="ev.BildUrl"
+               placeholder="Bild URL" />
+
+        <label>
+            <input type="checkbox"
+                   @bind="ev.IsArchived" />
+            Event archivieren
+        </label>
+
+        <br />
+
+        <div style="display:flex; gap:10px;">
+
+            <button class="btn btn-primary"
+                    @onclick="Save">
+                Speichern
+            </button>
+
+            <button class="btn btn-warning"
+                    @onclick="CopyEvent">
+                Event kopieren
+            </button>
+
+            <button class="btn btn-danger" @onclick="() => DeleteEvent(ev)">
+                Löschen
+            </button>
+
+        </div>
+
+        <p>@msg</p>
+
+    </div>
+}
+
+@code {
+    [Parameter] public int eventId { get; set; }
+
+    private Event? ev;
+
+    private string? startText;
+    private string? endText;
+
+    private string? msg;
+
+    private List<EventKursleiter> kursleiter = new();
+    private List<ApplicationUser> users = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        ev = await Db.Events.FirstOrDefaultAsync(x => x.Id == eventId);
+
+        if (ev != null)
+        {
+            startText = ev.StartZeit?.ToString("yyyy-MM-ddTHH:mm");
+            endText = ev.EndeZeit?.ToString("yyyy-MM-ddTHH:mm");
+        }
+
+        kursleiter = await Db.EventKursleiter
+            .Include(x => x.User)
+            .Where(x => x.EventId == eventId)
+            .ToListAsync();
+
+        users = await Db.Users.ToListAsync();
+    }
+
+    async Task Save()
+    {
+        if (ev == null) return;
+
+        if (DateTime.TryParse(startText, out var s))
+            ev.StartZeit = s;
+
+        if (DateTime.TryParse(endText, out var e))
+            ev.EndeZeit = e;
+
+        await Db.SaveChangesAsync();
+
+        msg = "Gespeichert!";
+    }
+
+    async Task CopyEvent()
+    {
+        if (ev == null)
+            return;
+
+        var newEvent = new Event
+            {
+                Eventname = ev.Eventname + "(Kopie)",
+
+                Kategorie = ev.Kategorie,
+
+                Beschreibung = ev.Beschreibung,
+
+                Location = ev.Location,
+
+                Treffpunkt = ev.Treffpunkt,
+
+                price = ev.price,
+
+                MaxKinder = ev.MaxKinder,
+
+                MinKinder = ev.MinKinder,
+
+                WaitlisteLimit = ev.WaitlisteLimit,
+
+                BrauchtBetreuung = ev.BrauchtBetreuung,
+
+                AnzahlBetreuung = ev.AnzahlBetreuung,
+
+                BrauchtFahrer = ev.BrauchtFahrer,
+
+                AnzahlSitzplaetze = ev.AnzahlSitzplaetze,
+
+                AlterMin = ev.AlterMin,
+
+                AlterMax = ev.AlterMax,
+
+                BildUrl = ev.BildUrl,
+
+                StartZeit = null,
+
+                EndeZeit = null,
+
+                IsArchived = false,
+
+                CopiedFromEventId = ev.Id
+            };
+
+        Db.Events.Add(newEvent);
+
+        await Db.SaveChangesAsync();
+
+        Nav.NavigateTo($"/kursleiter/events/edit/{newEvent.Id}");
+    }
+
+    async Task DeleteEvent(Event ev)
+    {
+        ev.IsDeleted = true;
+
+        var kursleiter = await Db.EventKursleiter
+            .Where(x => x.EventId == ev.Id)
+            .ToListAsync();
+
+        Db.EventKursleiter.RemoveRange(kursleiter);
+
+        await Db.SaveChangesAsync();
+        Nav.NavigateTo($"/kursleiter/events");
+    }
+
+    async Task AddKursleiter()
+    {
+        kursleiter.Add(new EventKursleiter
+            {
+                EventId = eventId
+            });
+    }
+
+    async Task RemoveKursleiter(EventKursleiter kl)
+    {
+        kursleiter.Remove(kl);
+        Db.EventKursleiter.Remove(kl);
+        await Db.SaveChangesAsync();
+    }
+}
