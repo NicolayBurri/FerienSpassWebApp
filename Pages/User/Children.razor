@@ -28,11 +28,13 @@ else
 
         <br /><br />
 
-        <input placeholder="Alter"
-               type="number"
-               @bind="newChild.Alter" />
-
-        <br /><br />
+        <p>
+            Alter:    
+            <input placeholder="Alter"
+                   type="number"
+                   @bind="newChild.Alter" />
+                   Jahre
+        </p>
 
         <select @bind="newChild.Klasse">
             @foreach (var k in Enum.GetValues<KlasseStufe>())

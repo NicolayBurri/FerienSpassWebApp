@@ -15,11 +15,11 @@
 
 <PageTitle>Event Kalender</PageTitle>
 
-<h3>Event Kalender</h3>
+<h1>Event Liste</h1>
 
 @if (isLoading)
 {
-    <p>Lade...</p>
+    <p>Momentan sind keine Events geplant.</p>
 }
 else
 {
@@ -37,80 +37,144 @@ else
         </Authorized>
     </AuthorizeView>
 
-    <select value="@selectedKategorie"
-        @onchange="OnKategorieChanged">
-        <option value="">Alle Kategorien</option>
-        <option value="@EventKategorie.Tier">Tiere</option>
-        <option value="@EventKategorie.Food">Essen</option>
-        <option value="@EventKategorie.Erlebnis">Erlebnis</option>
-        <option value="@EventKategorie.Kreativ">Kreativ</option>
-        <option value="@EventKategorie.Sport">Sport</option>
-        <option value="@EventKategorie.Vaki">Vaki</option>
-        <option value="@EventKategorie.Allgemein">Allgemein</option>
-    </select>
+    <div class="filter-bar">
+        <h4>Filter: </h4>
+        <select value="@selectedKategorie"
+            @onchange="OnKategorieChanged">
+            <option value="">Alle Kategorien</option>
+            <option value="@EventKategorie.Tier">Tiere</option>
+            <option value="@EventKategorie.Food">Essen</option>
+            <option value="@EventKategorie.Erlebnis">Erlebnis</option>
+            <option value="@EventKategorie.Kreativ">Kreativ</option>
+            <option value="@EventKategorie.Sport">Sport</option>
+            <option value="@EventKategorie.Vaki">Vaki</option>
+            <option value="@EventKategorie.Allgemein">Allgemein</option>
+        </select>
 
-    <input type="number" value="@filterAlter" @oninput="OnAlterChanged" />
+        <input type="number" value="@filterAlter" @oninput="OnAlterChanged" placeholder="Alter"/>
+
+        <button @onclick="ToggleDateFilter">Datum</button>
+
+        @if (showDateFilter)
+        {
+            <input type="date" @bind="filterDatum" @bind:after="LoadEvents" />
+        }
+
+    </div>
+
+    <br />
+    <br />
 
     @foreach (var group in eventsByDay)
     {
-        <h4>@group.Key.ToString("dddd dd.MM")</h4>
+        <h2>@group.Key.ToString("dddd dd.MM")</h2>
 
         @foreach (var ev in group.Value)
         {
-            <div style="border:1px solid #ccc; padding:8px; margin-bottom:5px;">
+            <div style="border:1px solid #ccc; padding:8px; margin-bottom:5px; display:flex; align-items:flex-start;">
 
-                <b>@ev.Eventname</b><br />
-                @ev.StartZeit?.ToString("HH:mm") - @ev.EndeZeit?.ToString("HH:mm")<br />
+                <div style="flex:auto;">
 
-                @if (ev.IsFull)
-                {
-                    <span style="color:red">AUSGEBUCHT</span>
-                }
+                    <h3>Event: @ev.Eventname</h3><br />
 
-                <br />
+                    <p> Zeit:
+                    @ev.StartZeit?.ToString("HH:mm") - @ev.EndeZeit?.ToString("HH:mm")
+                    </p>
 
-                <h4>Kursleiter</h4>
+                    <p>Kategorie:
+                        @ev.Kategorie
+                    </p>
 
-                @if (ev?.Kursleiter?.Any() == true)
-                {
-                    @foreach (var kl in ev.Kursleiter)
+                    <p>Beschreibung:
+                        @ev.Beschreibung
+                    </p>
+
+                    <p>Treffpunkt:
+                        @ev.Treffpunkt
+                    </p>
+
+                    <p>Eventlocation:
+                        @ev.Location
+                    </p>
+
+                    <p>Preis:
+                        @ev.price CHF
+                    </p>
+
+                    <p>
+                        Mindest- und Maximalkapazität:
+                        @ev.MinKinder - 
+                        @ev.MaxKinder Kinder
+                    </p>
+
+                    <p>Altersbeschränkung:
+                        @ev.AlterMin -
+                        @ev.AlterMax Jahre alt
+                    </p>
+
+                    <h4>Kursleiter </h4>
+
+                    @if (ev?.Kursleiter?.Any() == true)
                     {
-                        <p>@kl.User?.Vorname @kl.User?.Nachname</p>
+                        @foreach (var kl in ev.Kursleiter)
+                        {
+                            <p>@kl.User?.Vorname @kl.User?.Nachname</p>
+                        }
                     }
-                }
 
-                <button @onclick="() => GoToEvent(ev.Id)"
-                        disabled="@ev.IsFull">
-                    @(ev.IsFull ? "Ausgebucht" : "Anmelden")
-                </button>
 
-                @if (myRegsByEvent.TryGetValue(ev.Id, out var myRegs) && myRegs.Any())
+
+                    <button @onclick="() => GoToEvent(ev.Id)"
+                            disabled="@ev.IsFull">
+                        @(ev.IsFull ? "Ausgebucht" : "Anmelden")
+                    </button>
+
+                    <br/>
+
+                    @if (ev.IsFull)
+                    {
+                        <span style="color:red">AUSGEBUCHT</span>
+                    }
+
+                    <br />
+
+                    @if (myRegsByEvent.TryGetValue(ev.Id, out var myRegs) && myRegs.Any())
+                    {
+                        <div style="margin-top:8px;">
+                            <b>Meine Kinder:</b>
+
+                            <ul>
+                                @foreach (var r in myRegs)
+                                {
+                                    <li>
+                                        @r.Child.Name -
+
+                                        @if (r.Status == EnrollmentStatus.Confirmed)
+                                        {
+                                            <span style="color:green">Bestätigt</span>
+                                        }
+                                        else
+                                        {
+                                            <span style="color:orange">Warteliste</span>
+                                        }
+
+                                        <button @onclick="() => UnregisterChild(ev.Id, r.ChildId)">
+                                            Abmelden
+                                        </button>
+                                    </li>
+                                }
+                            </ul>
+                        </div>
+                    }
+                </div>
+
+                @if (!string.IsNullOrEmpty(ev.BildUrl))
                 {
-                    <div style="margin-top:8px;">
-                        <b>Meine Kinder:</b>
-
-                        <ul>
-                            @foreach (var r in myRegs)
-                            {
-                                <li>
-                                    @r.Child.Name -
-
-                                    @if (r.Status == EnrollmentStatus.Confirmed)
-                                    {
-                                        <span style="color:green">Bestätigt</span>
-                                    }
-                                    else
-                                    {
-                                        <span style="color:orange">Warteliste</span>
-                                    }
-
-                                    <button @onclick="() => UnregisterChild(ev.Id, r.ChildId)">
-                                        Abmelden
-                                    </button>
-                                </li>
-                            }
-                        </ul>
-                    </div>
+                    <img src="@ev.BildUrl"
+                         style="width:600px;
+                            max-height:500px;
+                            object-fit:cover;
+                            border-radius:10px;" />
                 }
             </div>
         }
@@ -120,6 +184,8 @@ else
 @code {
 
     private bool isLoading = true;
+    private bool showDateFilter = false;
+    private DateTime? filterDatum;
 
     private List<Event> events = new();
     private Dictionary<DateTime, List<Event>> eventsByDay = new();
@@ -182,6 +248,17 @@ else
             query = query.Where(x =>
                 (!x.AlterMin.HasValue || x.AlterMin <= filterAlter) &&
                 (!x.AlterMax.HasValue || x.AlterMax >= filterAlter));
+        }
+
+        // Datum Filter
+        if (filterDatum.HasValue)
+        {
+            var date = filterDatum.Value.Date;
+
+
+            query = query.Where(x => 
+                x.StartZeit.HasValue &&
+                x.StartZeit.Value.Date == date);
         }
 
         events = await query
@@ -347,6 +424,19 @@ else
             streamRef
         );
 
+
+    }
+
+    async Task ToggleDateFilter()
+    {
+        showDateFilter = !showDateFilter;
         
+
+        if (!showDateFilter)
+        {
+            filterDatum = null;
+        }
+
+        await LoadEvents();
     }
 }

@@ -1,5 +1,6 @@
 ﻿@page "/"
 @using FerienspassWebApp.Services
+@using System.Text.RegularExpressions
 @inject DocxService DocxService
 @inject IWebHostEnvironment Env
 
@@ -33,7 +34,7 @@ else
 
         Documents = files.Select(file => new DocItem
             {
-                Title = Path.GetFileNameWithoutExtension(file),
+                Title = Regex.Replace(Path.GetFileNameWithoutExtension(file), @"\d+\s", ""),
                 Html = DocxService.ConvertToHtml(file)
             }).ToList();
     }

@@ -6,21 +6,80 @@
 @using FerienspassWebApp.Data
 @using FerienspassWebApp.Models
 
-<h3>Event Kalender</h3>
+<h1>Event Kalender</h1>
 
 @foreach (var group in eventsByDay)
 {
-    <h4>@group.Key.ToString("dddd dd.MM")</h4>
+    <h2>@group.Key.ToString("dddd dd.MM")</h2>
 
-    @foreach(var ev in group.Value)
+    @foreach (var ev in group.Value)
     {
-        <div style="border:1px solid #ccc; padding:8px; margin-bottom:5px;">
-            <b>@ev.Eventname</b><br />
-            @ev.StartZeit?.ToString("HH:mm") - @ev.EndeZeit?.ToString("HH:mm")<br />
+        <div style="border:1px solid #ccc; padding:8px; margin-bottom:5px; display:flex; align-items:flex-start;">
 
-            @if (ev.IsFull)
+            <div style="flex:auto;">
+
+                <h3>Event: @ev.Eventname</h3><br />
+
+                <p>
+                    Zeit:
+                    @ev.StartZeit?.ToString("HH:mm") - @ev.EndeZeit?.ToString("HH:mm")
+                </p>
+
+                <p>
+                    Kategorie:
+                    @ev.Kategorie
+                </p>
+
+                <p>
+                    Beschreibung:
+                    @ev.Beschreibung
+                </p>
+
+                <p>
+                    Treffpunkt:
+                    @ev.Treffpunkt
+                </p>
+
+                <p>
+                    Eventlocation:
+                    @ev.Location
+                </p>
+
+                <p>
+                    Preis:
+                    @ev.price CHF
+                </p>
+
+                <p>
+                    Mindest- und Maximalkapazität:
+                    @ev.MinKinder -
+                    @ev.MaxKinder Kinder
+                </p>
+
+                <p>
+                    Altersbeschränkung:
+                    @ev.AlterMin -
+                    @ev.AlterMax Jahre alt
+                </p>
+
+                <h4>Kursleiter </h4>
+
+                @if (ev?.Kursleiter?.Any() == true)
+                {
+                    @foreach (var kl in ev.Kursleiter)
+                    {
+                        <p>@kl.User?.Vorname @kl.User?.Nachname</p>
+                    }
+                }
+            </div>
+
+            @if (!string.IsNullOrEmpty(ev.BildUrl))
             {
-                <span style="color:red">AUSGEBUCHT</span>
+                <img src="@ev.BildUrl"
+                     style="width:600px;
+                            max-height:500px;
+                            object-fit:cover;
+                            border-radius:10px;" />
             }
         </div>
     }

@@ -19,6 +19,13 @@
 
         <button @onclick="() => GoDetails(ev.Id)">Details</button>
         <button @onclick="() => GoEdit(ev.Id)">Bearbeiten</button>
+
+        @if (ev.EndeZeit < DateTime.Now)
+        {
+            <br />
+            <br />
+            <button style="color:red !important;" @onclick="() => ResetEvent(ev.Id)">Anmeldungen zurücksetzen</button>
+        }
     </div>
 }
 
@@ -46,5 +53,22 @@
     void GoEdit(int id)
     {
         Nav.NavigateTo($"/kursleiter/events/edit/{id}");
+    }
+
+    void ResetEvent(int eventId)
+    {
+        var ev = Db.Events.FirstOrDefault(x => x.Id == eventId);
+
+        if (ev == null || ev.EndeZeit >= DateTime.Now) return;
+
+        var registrations = Db.EventChildren
+            .Where(x => x.EventId == eventId)
+            .ToList();
+
+        Db.EventChildren.RemoveRange(registrations);
+
+        Db.SaveChanges();
+
+        StateHasChanged();
     }
 }

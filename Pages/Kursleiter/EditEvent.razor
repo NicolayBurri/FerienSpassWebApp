@@ -53,36 +53,45 @@ else
             + Kursleiter hinzufügen
         </button>
 
+        <p style="margin:0px;">Beschreibung:</p>
         <textarea @bind="ev.Beschreibung"
-                  placeholder="Beschreibung">
+                    placeholder="Beschreibung">
             </textarea>
 
+        <p style="margin:0px;">Location:</p>
         <input @bind="ev.Location"
                placeholder="Ort" />
 
+        <p style="margin:0px;">Treffpunkt:</p>
         <input @bind="ev.Treffpunkt"
                placeholder="Treffpunkt" />
 
+        <p style="margin:0px;">Preis in CHF:</p>
         <input type="number"
                @bind="ev.price"
                placeholder="Preis" />
 
+        <p style="margin:0px;">Mindestanzahl an Kinder:</p>
         <input type="number"
                @bind="ev.MinKinder"
                placeholder="Min Kinder" />
 
+        <p style="margin:0px;">Maximalanzahl an Kinder:</p>
         <input type="number"
                @bind="ev.MaxKinder"
                placeholder="Max Kinder" />
 
+        <p style="margin:0px;">Warteliste Limit:</p>
         <input type="number"
                @bind="ev.WaitlisteLimit"
                placeholder="Warteliste Limit" />
 
+        <p style="margin:0px;">Mindestalter:</p>
         <input type="number"
                @bind="ev.AlterMin"
                placeholder="Mindestalter" />
 
+        <p style="margin:0px;">Maximalalter:</p>
         <input type="number"
                @bind="ev.AlterMax"
                placeholder="Maximalalter" />

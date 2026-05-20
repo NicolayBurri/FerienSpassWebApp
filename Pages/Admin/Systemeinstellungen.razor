@@ -14,20 +14,26 @@
 
         <h4>Kursleiter Phase</h4>
 
+        <p>Startdatum aktuell:</p>
         <input type="datetime-local"
                value="@kursleiterStartText?.ToString("yyyy-MM-ddTHH:mm")"
                @onchange="e => kursleiterStartText = ParseDate(e.Value?.ToString())" />
 
+         <p>Enddatum</p>
         <input type="datetime-local"
                value="@kursleiterEndeText?.ToString("yyyy-MM-ddTHH:mm")"
                @onchange="e => kursleiterEndeText = ParseDate(e.Value?.ToString())" />
 
         <hr />
 
+        <h4>Eltern Phase</h4>
+
+        <p>Startdatum</p>
         <input type="datetime-local"
                value="@anmeldungStartText?.ToString("yyyy-MM-ddTHH:mm")"
                @onchange="e => anmeldungStartText = ParseDate(e.Value?.ToString())" />
 
+        <p>Enddatum</p>
         <input type="datetime-local"
                value="@anmeldungEndeText?.ToString("yyyy-MM-ddTHH:mm")"
                @onchange="e => anmeldungEndeText = ParseDate(e.Value?.ToString())" />
@@ -71,6 +77,12 @@
             Db.SystemSettings.Add(settings);
             await Db.SaveChangesAsync();
         }
+
+        kursleiterStartText = settings.KursleiterStart;
+        kursleiterEndeText = settings.KursleiterEnde;
+
+        anmeldungStartText = settings.AnmeldungStart;
+        anmeldungEndeText = settings.AnmeldungEnde;
 
     }
 
