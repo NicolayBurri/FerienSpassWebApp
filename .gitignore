@@ -4,3 +4,4 @@ obj/
 publish/
 *.user
 *.suo
+appsettings.Production.json
