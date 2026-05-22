@@ -30,7 +30,7 @@ jobs:
               uses: SamKirkland/FTP-Deploy-Action@v4.3.5
               with:
                 server: 94.231.94.150
-                username: ftp22175_ferienspass
+                username: ${{ secret.FTP_USER }}
                 password: F7P_fr0m_ferien$pa$$
                 local-dir: publish/
                 server-dir: /test/
