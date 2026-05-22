@@ -75,7 +75,10 @@ using (var scope = app.Services.CreateScope())
     var db = services.GetRequiredService<ApplicationDbContext>();
     db.Database.Migrate(); 
     
-    try { await SeedRoles.CreateRoles(services); }
+    try { 
+        await SeedRoles.CreateRoles(services);
+        await SeedRoles.CreateAdmin(services);
+    }
     catch (Exception ex) { Console.WriteLine("Speed Fehler: " + ex.Message); }
 
     
