@@ -34,6 +34,7 @@ namespace FerienspassWebApp.Areas.Identity.Data
             {
                 using var smtp = new SmtpClient();
 
+                //testsetup
                 await smtp.ConnectAsync(
                     _config["Email:Smtp"],
                     int.Parse(_config["Email:Port"]),
