@@ -18,6 +18,7 @@ public static class SeedRoles
     }
 
 
+    //New added 22.05.2026
     public static async Task CreateAdmin(IServiceProvider serviceProvider)
     {
         Console.WriteLine("Admin Seed started");
