@@ -72,10 +72,12 @@ using (var scope = app.Services.CreateScope())
     var services = scope.ServiceProvider;
 
     var db = services.GetRequiredService<ApplicationDbContext>();
-    db.Database.Migrate();  
+    db.Database.Migrate(); 
+    
+    try { await SeedRoles.CreateRoles(services); }
+    catch (Exception ex) { Console.WriteLine("Speed Fehler: " + ex.Message); }
 
-
-    await SeedRoles.CreateRoles(services);
+    
 }
 
     app.Run();

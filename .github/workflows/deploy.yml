@@ -29,8 +29,8 @@ jobs:
             - name: FTP Deploy
               uses: SamKirkland/FTP-Deploy-Action@v4.3.5
               with:
-                server: ${{ secrets.94.231.94.150}}
-                username: ${{ secrets.ftp22175_ferienspass}}
-                password: ${{ secrets.F7P_fr0m_ferien$pa$$}}
+                server: ${{ secrets.FTP_SERVER}}
+                username: ${{ secrets.FTP_USER}}
+                password: ${{ secrets.FTP_PASSWORD}}
                 local-dir: publish/
                 server-dir: /test/
