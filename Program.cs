@@ -71,7 +71,7 @@ using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
 
-    //added 22.05.2026 update
+    //added 22.05.2026
     var db = services.GetRequiredService<ApplicationDbContext>();
     db.Database.Migrate(); 
     
