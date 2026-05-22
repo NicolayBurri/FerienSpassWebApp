@@ -37,7 +37,7 @@ namespace FerienspassWebApp.Areas.Identity.Data
                 await smtp.ConnectAsync(
                     _config["Email:Smtp"],
                     int.Parse(_config["Email:Port"]),
-                    SecureSocketOptions.StartTls
+                    SecureSocketOptions.SslOnConnect
                 );
 
                 await smtp.AuthenticateAsync(
