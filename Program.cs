@@ -70,6 +70,11 @@ app.MapFallbackToPage("/_Host");
 using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
+
+    var db = services.GetRequiredService<ApplicationDbContext>();
+    db.Database.Migrate();  
+
+
     await SeedRoles.CreateRoles(services);
 }
 
