@@ -49,5 +49,7 @@ namespace FerienspassWebApp.Models
         public bool IsDeleted { get; set; } = false;
 
         public DateTime? DeletedAt { get; set; }
+
+        public List<EventRoleAssignment> EventRoleAssignments { get; set; } = new();
     }
 }

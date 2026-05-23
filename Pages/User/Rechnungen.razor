@@ -47,7 +47,7 @@ else
             }
 
             <a class="btn btn-primary"
-               href="@($"/rechnungen/rechnung_{invoice.Id}.pdf")"
+               href="@($"/api/invoices/{invoice.Id}/download")"
                target="_blank">
                 PDF öffnen
             </a>
@@ -68,10 +68,10 @@ else
             .FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)
             ?.Value;
 
-        invoices = Db.Invoices
+        invoices = await Db.Invoices
             .Where(x => x.ParentUserId == userId)
             .OrderByDescending(x => x.CreatedAt)
-            .ToList();
+            .ToListAsync();
     }
 
     string GetColor(InvoiceStatus status)

@@ -27,6 +27,8 @@ namespace FerienspassWebApp.Data
 
         public DbSet<SystemSettings> SystemSettings { get; set; }
 
+
+
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);
@@ -59,6 +61,14 @@ namespace FerienspassWebApp.Data
                 .HasOne(x => x.User)
                 .WithMany()
                 .HasForeignKey(x => x.UserId);
+
+            builder.Entity<EventRoleAssignment>()
+                .HasKey(x => x.Id);
+
+            builder.Entity<EventRoleAssignment>()
+                .HasOne(x => x.Event)
+                .WithMany(x => x.EventRoleAssignments)
+                .HasForeignKey(x => x.EventId);
 
             builder.Entity<EventRoleAssignment>()
                 .HasOne(x => x.User)

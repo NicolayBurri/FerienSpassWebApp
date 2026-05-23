@@ -166,6 +166,38 @@ else
                             </ul>
                         </div>
                     }
+
+                    @if (myRolesByEvent.TryGetValue(ev.Id, out var roles) && roles.Any())
+                    {
+                        <div style="margin-top:8px;">
+                            <b>Meine Rollen:</b>
+
+                            <ul>
+                                @foreach (var r in roles)
+                                {
+                                    <li>
+                                        @if (r.Role == RoleType.Driver)
+                                        {
+                                            <span>Fahrer</span>
+
+                                            @if (r.Seats.HasValue)
+                                            {
+                                                <span> (@r.Seats Plätze)</span>
+                                            }
+                                        }
+                                        else if (r.Role == RoleType.Helper)
+                                        {
+                                            <span>Betreuungsperson</span>
+                                        }
+
+                                        <button @onclick="() => UnregisterRole(r.Id)">
+                                            Abmelden
+                                        </button>
+                                    </li>
+                                }
+                            </ul>
+                        </div>
+                    }
                 </div>
 
                 @if (!string.IsNullOrEmpty(ev.BildUrl))
@@ -189,6 +221,7 @@ else
 
     private List<Event> events = new();
     private Dictionary<DateTime, List<Event>> eventsByDay = new();
+    private Dictionary<int, List<EventRoleAssignment>> myRolesByEvent = new();
 
     private EventKategorie? selectedKategorie;
     private int? filterAlter;
@@ -230,19 +263,17 @@ else
     private async Task LoadEvents()
     {
         var query = Db.Events
-            .Include(x=> x.Kursleiter)
-            .ThenInclude(x => x.User)
             .AsNoTracking()
+            .Include(x => x.Kursleiter)
+                .ThenInclude(x => x.User)
             .Where(x => !x.IsDeleted)
             .Where(x => x.StartZeit >= DateTime.Now);
 
-        // Kategorie Filter
         if (selectedKategorie.HasValue)
         {
             query = query.Where(x => x.Kategorie == selectedKategorie);
         }
 
-        // Alter Filter
         if (filterAlter.HasValue)
         {
             query = query.Where(x =>
@@ -250,20 +281,20 @@ else
                 (!x.AlterMax.HasValue || x.AlterMax >= filterAlter));
         }
 
-        // Datum Filter
         if (filterDatum.HasValue)
         {
             var date = filterDatum.Value.Date;
 
-
-            query = query.Where(x => 
+            query = query.Where(x =>
                 x.StartZeit.HasValue &&
                 x.StartZeit.Value.Date == date);
         }
 
-        events = await query
+        var result = await query
             .OrderBy(x => x.StartZeit)
             .ToListAsync();
+
+        events = result;
 
         eventsByDay = events
             .Where(x => x.StartZeit.HasValue)
@@ -280,6 +311,15 @@ else
             .ToListAsync();
 
         myRegsByEvent = allRegs
+            .GroupBy(x => x.EventId)
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        var myRoles = await Db.EventRoleAssignments
+            .AsNoTracking()
+            .Where(x => x.UserId == userId)
+            .ToListAsync();
+
+        myRolesByEvent = myRoles
             .GroupBy(x => x.EventId)
             .ToDictionary(g => g.Key, g => g.ToList());
     }
@@ -425,6 +465,20 @@ else
         );
 
 
+    }
+
+    async Task UnregisterRole(int roleId)
+    {
+        var entry = await Db.EventRoleAssignments
+            .FirstOrDefaultAsync(x => x.Id == roleId);
+
+        if (entry == null)
+            return;
+
+        Db.EventRoleAssignments.Remove(entry);
+        await Db.SaveChangesAsync();
+
+        await LoadMyRegistrations();
     }
 
     async Task ToggleDateFilter()

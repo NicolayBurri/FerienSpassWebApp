@@ -145,20 +145,6 @@ else
 
         <br /><br />
 
-        @if (results.Any())
-        {
-            <hr />
-
-            <h4>Ergebnis</h4>
-
-            @foreach (var r in results)
-            {
-                <p style="color:@r.Color">
-                    @r.ChildName → @r.Status
-                </p>
-            }
-        }
-
     </div>
 }
 
@@ -167,9 +153,22 @@ else
     <div class="popup-backdrop" @onclick="ClosePopup">
         <div class="popup-box" @onclick:stopPropagation="true">
 
-            <h4>Anmeldung erfolgreich</h4>
+            <h4>Ergebnis der Anmeldung</h4>
 
-            <p>Möchtest du zur Rechnung gehen oder weitere Events buchen?</p>
+            <div style="margin-top:10px; text-align:left;">
+                @foreach (var r in results)
+                {
+                    <p style="color:@r.Color; margin:4px 0;">
+                        @r.ChildName → @r.Status
+                    </p>
+                }
+            </div>
+
+            <hr />
+
+            <p style="margin-top:10px;">
+                Möchtest du zur Rechnung gehen oder weitere Events buchen?
+            </p>
 
             <div style="display:flex; gap:10px; justify-content:center; margin-top:15px;">
                 <button class="btn btn-primary" @onclick="GoToInvoice">
@@ -214,11 +213,14 @@ else
         public string Status { get; set; } = "";
 
         public string Color { get; set; } = "black";
+
+        public bool WasSuccessful { get; set; }
     }
 
     private List<RegistrationResult> results = new();
 
     private bool showPopup = false;
+    private bool anyChildConfirmed = false;
 
     protected override async Task OnInitializedAsync()
     {
@@ -234,6 +236,10 @@ else
                 return;
 
             ev = await Db.Events
+                .Include(x => x.Kursleiter)
+                    .ThenInclude(k => k.User)
+                .Include(x => x.EventRoleAssignments)
+                    .ThenInclude(r => r.User)
                 .FirstOrDefaultAsync(x => x.Id == eventId);
 
             children = await Db.Children
@@ -323,7 +329,6 @@ else
                 auth.User.IsInRole("Kursleiter") ||
                 auth.User.IsInRole("Admin");
 
-            // 🔐 PHASEN-CHECK
             if (isKursleiterUser)
             {
                 if (!kursleiterPhase)
@@ -435,6 +440,7 @@ else
                 if (currentConfirmed < ev.MaxKinder)
                 {
                     status = EnrollmentStatus.Confirmed;
+                    anyChildConfirmed = true;
                 }
                 else if (currentWaiting < ev.WaitlisteLimit)
                 {
@@ -470,6 +476,45 @@ else
                             : "darkorange"
                     });
             }
+
+            if (!anyChildConfirmed && (willDrive || willHelp))
+            {
+                results.Add(new RegistrationResult
+                    {
+                        ChildName = "",
+                        Status = "Fahrer/Helfer nur erlaubt wenn mindestens ein Kind bestätigt wurde",
+                        Color = "red"
+
+                    });
+
+                showPopup = true;
+                return;
+            }
+
+            await Db.SaveChangesAsync();
+
+
+            if (willDrive)
+            {
+                Db.EventRoleAssignments.Add(new EventRoleAssignment
+                    {
+                        EventId = ev.Id,
+                        UserId = currentUserId!,
+                        Role = RoleType.Driver,
+                        Seats = driverSeats
+                    });
+            }
+
+            if (willHelp)
+            {
+                Db.EventRoleAssignments.Add(new EventRoleAssignment
+                    {
+                        EventId = ev.Id,
+                        UserId = currentUserId!,
+                        Role = RoleType.Helper
+                    });
+            }
+
 
             await Db.SaveChangesAsync();
             await transaction.CommitAsync();

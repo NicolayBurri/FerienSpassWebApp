@@ -1,35 +1,49 @@
 ﻿<AuthorizeView>
     <Authorized>
-        <nav class="navbar navbar-expand custom-navbar">
+        <nav class="navbar custom-navbar">
 
-            <picture>
-                <source media="(min-width: 650px)" srcset="Bilder/Ferienspass.png" />
-                <img src="Bilder/Ferienspass.png" alt="Ferienspass" />
-            </picture>
+            <div class="left-side"></div>
 
-            <a href="Identity/Account/Manage">
-                @context.User.Identity?.Name
-            </a>
+            <div class="center">
+                <picture>
+                    <source media="(min-width: 650px)" srcset="Bilder/Ferienspass.png" />
+                    <img src="Bilder/Ferienspass.png" alt="Ferienspass" />
+                </picture>
+            </div>
 
-            <form method="post" action="/Identity/Account/Logout">
-                <button type="submit" class="nav-link btn btn-link">
-                    Log out
-                </button>
-            </form>
+            <div class="right-side">
+
+                <a href="Identity/Account/Manage">
+                    Logindaten für @context.User.Identity?.Name ändern
+                </a>
+
+                <form method="post" action="/Identity/Account/Logout">
+                    <button type="submit" class="btn btn-link">
+                        Log out
+                    </button>
+                </form>
+
+            </div>
 
         </nav>
     </Authorized>
 
     <NotAuthorized>
-        <nav class="navbar navbar-expand custom-navbar">
+        <nav class="navbar custom-navbar">
 
-            <picture>
-                <source media="(min-width: 650px)" srcset="Bilder/Ferienspass.png" />
-                <img src="Bilder/Ferienspass.png" alt="Ferienspass" />
-            </picture>
+            <div class="left-side"></div>
 
-            <a href="Identity/Account/Register">Register</a>
-            <a href="Identity/Account/Login">Log in</a>
+            <div class="center">
+                <picture>
+                    <source media="(min-width: 650px)" srcset="Bilder/Ferienspass.png" />
+                    <img src="Bilder/Ferienspass.png" alt="Ferienspass" />
+                </picture>
+            </div>
+
+            <div class="right-side">
+                <a href="Identity/Account/Register">Register</a>
+                <a href="Identity/Account/Login">Log in</a>
+            </div>
 
         </nav>
     </NotAuthorized>

@@ -5,6 +5,7 @@
 
 @using FerienspassWebApp.Data
 @using FerienspassWebApp.Models
+@using Microsoft.EntityFrameworkCore
 
 <h1>Event Kalender</h1>
 
@@ -68,6 +69,7 @@
                 {
                     @foreach (var kl in ev.Kursleiter)
                     {
+
                         <p>@kl.User?.Vorname @kl.User?.Nachname</p>
                     }
                 }
@@ -89,21 +91,23 @@
     private List<Event> events = new();
     private Dictionary<DateTime, List<Event>> eventsByDay = new();
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
-        base.OnInitialized();
-        {
-            events = Db.Events
-                .Where(x => !x.IsDeleted)
-                .Where(x => x.StartZeit >= DateTime.Now)
-                .OrderBy(x => x.StartZeit!.Value.Date)
-                .ToList();
+        var now = DateTime.Now;
 
-            eventsByDay = events
-                .Where(x => x.StartZeit.HasValue)
-                .GroupBy(x => x.StartZeit!.Value.Date)
-                .ToDictionary(g => g.Key, g => g.ToList());
-        }
+        events = await Db.Events
+            .AsNoTracking()
+            .Include(x => x.Kursleiter)
+                .ThenInclude(k => k.User)
+            .Where(x => !x.IsDeleted)
+            .Where(x => x.StartZeit >= now)
+            .OrderBy(x => x.StartZeit)
+            .ToListAsync();
+
+        eventsByDay = events
+            .Where(x => x.StartZeit.HasValue)
+            .GroupBy(x => x.StartZeit!.Value.Date)
+            .ToDictionary(g => g.Key, g => g.ToList());
     }
 
 }

@@ -18,7 +18,7 @@
 
 @if (isLoading)
 {
-    <p>Lade...</p>
+    <p>Laden...</p>
 }
 else if (!items.Any())
 {
@@ -49,15 +49,17 @@ else
 
     <h4>QR Rechnung</h4>
 
-    <p><b>Referenz:</b> @referenceNumber</p>
-    <p><b>Total:</b> CHF @total</p>
-
     @if (!string.IsNullOrEmpty(qrSvg))
     {
+        <p><b>Referenz:</b> @referenceNumber</p>
+        <p><b>Total:</b> CHF @total</p>
+
         <div>
             @((MarkupString)qrSvg)
         </div>
-        <a class="btn btn-primary" href="@($"/rechnungen/{pdfFileName}")" target="_blank">
+        <a class="btn btn-primary"
+           href="@($"/api/invoices/{invoiceID}/download")"
+           target="_blank">
             PDF herunterladen
         </a>
 
@@ -77,6 +79,7 @@ else
 
 @code {
     private string? userId;
+    private int? invoiceID;
     private List<EventChild> items = new();
     private decimal total;
     private bool isLoading = true;
@@ -127,8 +130,10 @@ else
 
             Db.Invoices.Add(invoice);
 
-            // 🔥 WICHTIG: FIRST SAVE
-            await Db.SaveChangesAsync(); // <- HIER MUSS ES SEIN
+            //FIRST SAVE
+            await Db.SaveChangesAsync();
+
+            invoiceID = invoice.Id;
 
             foreach (var item in items)
             {
@@ -159,17 +164,19 @@ else
 
     async Task GeneratePdf(Invoice invoice)
     {
-        const int marginLeft = 40;
-        const int marginTop = 40;
+        const int margin = 15;
 
         var user = await Db.Users
             .FirstOrDefaultAsync(x => x.Id == userId);
 
+        if (user == null)
+            return;
 
-        // Aufsetzen von Rechnungsdaten
-        Bill bill = new Bill
+        // ----------------------------
+        // QR BILL
+        // ----------------------------
+        var bill = new Bill
             {
-                // Kreditor Daten
                 Account = IBAN,
                 Creditor = new Address
                 {
@@ -178,100 +185,212 @@ else
                     AddressLine2 = CreditorCity,
                     CountryCode = "CH"
                 },
-
-                //Zahlungsdaten
                 Amount = total,
                 Currency = "CHF",
-
-                //Debitor Daten
                 Debtor = new Address
                 {
-                    Name = $"Familie {user.Nachname} ",
+                    Name = $"Familie {user.Nachname}",
                     AddressLine1 = user.Strasse,
                     AddressLine2 = $"{user.PLZ} {user.Ort}",
                     CountryCode = "CH"
                 },
-
-                //Referenzen
                 Reference = invoice.Reference
             };
 
-        byte[] svg = QRBill.Generate(bill);
+        byte[] qrSvgBytes = QRBill.Generate(bill);
 
-        qrSvg = System.Text.Encoding.UTF8.GetString(svg);
+        qrSvg = System.Text.Encoding.UTF8.GetString(qrSvgBytes);
 
-        // SVG -> PNG
-        byte[] png = ConvertSvgToPng(svg);
+        byte[] qrPng = ConvertSvgToPng(qrSvgBytes);
 
-        //PDF Erstellen
+        // ----------------------------
+        // PDF SETUP
+        // ----------------------------
         using var document = new PdfDocument();
 
         var page = document.AddPage();
 
-        // A4 Format
         page.Width = XUnit.FromMillimeter(210);
         page.Height = XUnit.FromMillimeter(297);
 
-        using var gfx = XGraphics.FromPdfPage(page);
+        XGraphics gfx = XGraphics.FromPdfPage(page);
 
-        using var ms = new MemoryStream(png);
-
-        var image = XImage.FromStream(() => ms);
-
-        // Ganzes PDF füllen
         var titleFont = new XFont("Arial", 20);
         var textFont = new XFont("Arial", 12);
 
-        gfx.DrawString(
-            "FerienSpass Rohrbach",
-            titleFont,
-            XBrushes.Black,
-            new XRect(marginLeft, marginTop, page.Width, 30),
-            XStringFormats.TopLeft);
+        var contentWidth = page.Width - 2 * margin;
 
-        int y = marginTop + 60;
+        double y = margin;
 
-        foreach(var item in items)
+        // ----------------------------
+        // HEADER WITH LOGO
+        // ----------------------------
+        var logoPath = Path.Combine(
+            Env.WebRootPath,
+            "Bilder",
+            "Ferienspass.png");
+
+        double heightsize = 500;
+        double widthsize = 100;
+
+        if (File.Exists(logoPath))
+        {
+            using var logoStream = File.OpenRead(logoPath);
+            using var logo = XImage.FromStream(() => logoStream);
+
+            gfx.DrawImage(
+                logo,
+                margin,
+                y,
+                heightsize,
+                widthsize);
+        }
+
+        y += 120;
+
+        // ----------------------------
+        // TABLE LAYOUT
+        // ----------------------------
+        double colName = margin;
+        double colEvent = margin + 200;
+        double colPrice = page.Width - margin - 100;
+
+        // ----------------------------
+        // TABLE HEADER METHOD
+        // ----------------------------
+        void DrawTableHeader()
         {
             gfx.DrawString(
-                $"{item.Child.Name} - {item.Event.Eventname} - CHF {item.Event.price}",
+                "Kind",
                 textFont,
                 XBrushes.Black,
-                new XRect(marginLeft, y, page.Width, 20),
+                new XRect(colName, y, 200, 20),
                 XStringFormats.TopLeft);
 
+            gfx.DrawString(
+                "Event",
+                textFont,
+                XBrushes.Black,
+                new XRect(colEvent, y, 250, 20),
+                XStringFormats.TopLeft);
+
+            gfx.DrawString(
+                "Preis",
+                textFont,
+                XBrushes.Black,
+                new XRect(colPrice, y, 100, 20),
+                XStringFormats.TopRight);
+
             y += 25;
+
+            gfx.DrawLine(
+                XPens.Black,
+                margin,
+                y,
+                page.Width - margin,
+                y);
+
+            y += 15;
+        }
+
+        // ----------------------------
+        // FIRST TABLE HEADER
+        // ----------------------------
+        DrawTableHeader();
+
+        // ----------------------------
+        // ITEMS
+        // ----------------------------
+        foreach (var item in items)
+        {
+            // Neue Seite wenn nötig
+            if (y > page.Height - 250)
+            {
+                page = document.AddPage();
+
+                page.Width = XUnit.FromMillimeter(210);
+                page.Height = XUnit.FromMillimeter(297);
+
+                gfx.Dispose();
+
+                gfx = XGraphics.FromPdfPage(page);
+
+                y = margin;
+
+                DrawTableHeader();
+            }
+
+            gfx.DrawString(
+                item.Child.Name,
+                textFont,
+                XBrushes.Black,
+                new XRect(colName, y, 200, 20),
+                XStringFormats.TopLeft);
+
+            gfx.DrawString(
+                item.Event.Eventname,
+                textFont,
+                XBrushes.Black,
+                new XRect(colEvent, y, 250, 20),
+                XStringFormats.TopLeft);
+
+            gfx.DrawString(
+                $"CHF {item.Event.price:0.00}",
+                textFont,
+                XBrushes.Black,
+                new XRect(colPrice, y, 100, 20),
+                XStringFormats.TopRight);
+
+            y += 22;
         }
 
         y += 20;
 
+        // ----------------------------
+        // TOTAL
+        // ----------------------------
         gfx.DrawString(
-                $"Total: CHF{total}",
-                textFont,
-                XBrushes.Black,
-                new XRect(marginLeft, y, page.Width, 30),
-                XStringFormats.TopLeft);
+            $"Total: CHF {total:0.00}",
+            new XFont("Arial", 14),
+            XBrushes.Black,
+            new XRect(margin, y, contentWidth, 30),
+            XStringFormats.TopRight);
+
+        // ----------------------------
+        // QR CODE
+        // ----------------------------
+        using var ms = new MemoryStream(qrPng);
+
+        using var image = XImage.FromStream(() => ms);
+
+        double qrSizeheight = 300;
+        double qrSizewidth = 550;
 
         gfx.DrawImage(
             image,
-            0,
-            page.Height - 350,
-            500,
-            320);
+            page.Width - margin - qrSizewidth,
+            page.Height - margin - qrSizeheight,
+            qrSizewidth,
+            qrSizeheight);
 
-        // Ordner erstellen falls nicht vorhanden
-        var folder = Path.Combine(Env.WebRootPath, "rechnungen");
+        // ----------------------------
+        // STORAGE
+        // ----------------------------
+        var folder = Path.Combine(
+            Env.ContentRootPath,
+            "PrivateFiles",
+            "Rechnungen");
 
         if (!Directory.Exists(folder))
             Directory.CreateDirectory(folder);
 
-        // Dateiname
         pdfFileName = $"rechnung_{invoice.Id}.pdf";
 
         var path = Path.Combine(folder, pdfFileName);
 
-        // PDF speichern
         document.Save(path);
+
+        gfx.Dispose();
     }
 
     string GenerateISO11649(string input)

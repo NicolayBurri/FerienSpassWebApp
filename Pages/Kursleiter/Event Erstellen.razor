@@ -5,8 +5,10 @@
 @using Microsoft.AspNetCore.Components.Forms
 @using Microsoft.EntityFrameworkCore
 @using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Identity
 
 @inject ApplicationDbContext Db
+@inject UserManager<ApplicationUser> UserManager
 
 @attribute [Authorize(Roles = "Admin,Kursleiter")]
 
@@ -129,9 +131,12 @@
     private List<ApplicationUser> users = new();
     private List<string> selectedUserIds = new();
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
-        users = Db.Users.ToList();
+        var admins = await UserManager.GetUsersInRoleAsync("Admin");
+        var kursleiter = await UserManager.GetUsersInRoleAsync("Kursleiter");
+
+        users = admins.Concat(kursleiter).Distinct().ToList();
     }
 
     private async Task HandleFileUpload(InputFileChangeEventArgs e)
