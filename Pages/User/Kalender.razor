@@ -124,7 +124,7 @@ else
 
 
 
-                    <button @onclick="() => GoToEvent(ev.Id)"
+                    <button class="btn btn-sm btn-primary" @onclick="() => GoToEvent(ev.Id)"
                             disabled="@ev.IsFull">
                         @(ev.IsFull ? "Ausgebucht" : "Anmelden")
                     </button>
@@ -140,28 +140,40 @@ else
 
                     @if (myRegsByEvent.TryGetValue(ev.Id, out var myRegs) && myRegs.Any())
                     {
-                        <div style="margin-top:8px;">
+                        <div style="margin-top:8px; gap:10px;">
                             <b>Meine Kinder:</b>
 
                             <ul>
                                 @foreach (var r in myRegs)
                                 {
-                                    <li>
-                                        @r.Child.Name -
+                                    <div style="display:flex; flex-direction:column; gap:6px;">
 
-                                        @if (r.Status == EnrollmentStatus.Confirmed)
-                                        {
-                                            <span style="color:green">Bestätigt</span>
-                                        }
-                                        else
-                                        {
-                                            <span style="color:orange">Warteliste</span>
-                                        }
+                                        <div style="display:flex; gap:20px;">
+                                            <p>Kind: </p>
 
-                                        <button @onclick="() => UnregisterChild(ev.Id, r.ChildId)">
-                                            Abmelden
-                                        </button>
-                                    </li>
+                                            @r.Child.Name 
+                                            
+                                            <p> - </p>
+
+                                            <p>Status: </p>
+
+                                            @if (r.Status == EnrollmentStatus.Confirmed)
+                                            {
+                                                <span style="color:green">Bestätigt</span>
+                                            }
+                                            else
+                                            {
+                                                <span style="color:orange">Warteliste</span>
+                                            }
+
+                                            <button style="max-height:30px; font-size:14px; line-height:5px;" class="btn btn-warning" @onclick="() => UnregisterChild(ev.Id, r.ChildId)">
+                                                Abmelden
+                                            </button>
+                                            <br/>
+
+                                            <br />
+                                        </div>
+                                    </div>
                                 }
                             </ul>
                         </div>
