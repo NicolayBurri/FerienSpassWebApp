@@ -9,7 +9,7 @@
 @inject AuthenticationStateProvider AuthStateProvider
 @inject ApplicationDbContext Db
 
-<h3>Konto</h3>
+<h2>Konto</h2>
 
 @if (user == null)
 {
@@ -37,7 +37,7 @@ else
         <label>Telefonnummer</label>
         <input @bind="user.Telefonnummer" />
 
-        <button @onclick="Save">Speichern</button>
+        <button style="height:30px; font-size:15px; line-height:5px;" class="btn btn-primary" @onclick="Save">Speichern</button>
 
         @if (!string.IsNullOrEmpty(message))
         {
@@ -48,20 +48,26 @@ else
     <hr />
     <h4>Notfallkontakte</h4>
 
-    <input placeholder="Name" @bind="newContact.Name" />
-    <input placeholder="Telefon" @bind="newContact.Telefon" />
-    <input placeholder="Beziehung" @bind="newContact.Beziehung" />
+    <div style="margin-bottom:8px; gap:20px; display:flex;">
 
-    <button @onclick="AddContact">Hinzufügen</button>
+        <input placeholder="Name" @bind="newContact.Name" />
+        <input placeholder="Telefon" @bind="newContact.Telefon" />
+        <input placeholder="Beziehung" @bind="newContact.Beziehung" />
+
+        <button style="height:30px; font-size:15px; line-height:5px;" class="btn btn-primary" @onclick="AddContact">Hinzufügen</button>
+
+    </div>
 
     <hr />
 
     @foreach (var c in contacts)
     {
-        <div style="margin-bottom:8px; border:1px solid #ddd; padding:8px;">
-            <b>@c.Name</b> - @c.Telefon (@c.Beziehung)
+        <div style="margin-bottom:8px; border:1px solid #ddd; padding:8px; gap:20px; display:flex;">
+            <b>@c.Name</b>
+            <p>Telefon: @c.Telefon  </p>
+            <p>Beziehung: (@c.Beziehung) </p>
 
-            <button @onclick="() => DeleteContact(c)">Löschen</button>
+            <button style="height:30px; font-size:15px; line-height:5px;" class="btn btn-warning" @onclick="() => DeleteContact(c)">Löschen</button>
         </div>
     }
 }

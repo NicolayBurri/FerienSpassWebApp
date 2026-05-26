@@ -53,7 +53,7 @@ else
 
         <input type="number" value="@filterAlter" @oninput="OnAlterChanged" placeholder="Alter"/>
 
-        <button @onclick="ToggleDateFilter">Datum</button>
+        <button class="btn btn-sm btn-dark" @onclick="ToggleDateFilter">Datum</button>
 
         @if (showDateFilter)
         {
@@ -146,7 +146,8 @@ else
                             <ul>
                                 @foreach (var r in myRegs)
                                 {
-                                    <div style="display:flex; flex-direction:column; gap:6px;">
+                                    <li>
+                                       
 
                                         <div style="display:flex; gap:20px;">
                                             <p>Kind: </p>
@@ -173,7 +174,8 @@ else
 
                                             <br />
                                         </div>
-                                    </div>
+                                   
+                                    </li>
                                 }
                             </ul>
                         </div>
@@ -188,23 +190,25 @@ else
                                 @foreach (var r in roles)
                                 {
                                     <li>
-                                        @if (r.Role == RoleType.Driver)
-                                        {
-                                            <span>Fahrer</span>
-
-                                            @if (r.Seats.HasValue)
+                                        <div style="display:flex; gap:20px;">
+                                            @if (r.Role == RoleType.Driver)
                                             {
-                                                <span> (@r.Seats Plätze)</span>
-                                            }
-                                        }
-                                        else if (r.Role == RoleType.Helper)
-                                        {
-                                            <span>Betreuungsperson</span>
-                                        }
+                                                <span>Fahrer</span>
 
-                                        <button @onclick="() => UnregisterRole(r.Id)">
-                                            Abmelden
-                                        </button>
+                                                @if (r.Seats.HasValue)
+                                                {
+                                                    <span> (@r.Seats Plätze)</span>
+                                                }
+                                            }
+                                            else if (r.Role == RoleType.Helper)
+                                            {
+                                                <span>Betreuungsperson</span>
+                                            }
+
+                                            <button style="height:30px; font-size:15px; line-height:5px;" class="btn btn-warning" @onclick="() => UnregisterRole(r.Id)">
+                                                Abmelden
+                                            </button>
+                                        </div>
                                     </li>
                                 }
                             </ul>
