@@ -280,16 +280,32 @@ else
 
         var wsDrivers = workbook.Worksheets.Add("Fahrer");
 
-        wsDrivers.Cell(1, 1).Value = "User";
-        wsDrivers.Cell(1, 2).Value = "Sitzplätze";
-
-        int r = 2;
-
-        foreach (var d in drivers)
+        if (ev.BrauchtFahrer)
         {
-            wsDrivers.Cell(r, 1).Value = d.User?.UserName;
-            wsDrivers.Cell(r, 2).Value = d.Seats ?? 0;
-            r++;
+
+            wsDrivers.Cell(1, 1).Value = "User";
+            wsDrivers.Cell(1, 2).Value = "Sitzplätze";
+
+            int r = 2;
+
+            if(drivers.Any())
+            {
+                wsDrivers.Cell(1, 5).Value = $"Es fehlen noch: {missingDrivers} Fahrer"; 
+                foreach (var d in drivers)
+                {
+                    wsDrivers.Cell(r, 1).Value = d.User?.UserName;
+                    wsDrivers.Cell(r, 2).Value = d.Seats ?? 0;
+                    r++;
+                }
+            }
+            else
+            {
+                wsDrivers.Cell(r, 1).Value = "Es hat sich noch kein Fahrer angemeldet.";
+            }
+        }
+        else
+        {
+            wsDrivers.Cell(2, 1).Value = "Es werden für diesen Event keine Fahrer benötigt.";
         }
 
         var helpers = Db.EventRoleAssignments
@@ -299,14 +315,31 @@ else
 
         var wsHelpers = workbook.Worksheets.Add("Betreuung");
 
-        wsHelpers.Cell(1, 1).Value = "User";
-
-        int r2 = 2;
-
-        foreach (var h in helpers)
+        if (ev.BrauchtBetreuung)
         {
-            wsHelpers.Cell(r2, 1).Value = h.User?.UserName;
-            r2++;
+            wsDrivers.Cell(1, 5).Value = $"Es fehlen noch: {missingHelper} Betreuungspersonen / Helfer";
+            wsHelpers.Cell(1, 1).Value = "User";
+
+            int r2 = 2;
+
+            if (helpers.Any())
+            {
+
+                foreach (var h in helpers)
+                {
+                    wsHelpers.Cell(r2, 1).Value = h.User?.UserName;
+                    r2++;
+                }
+
+            }
+            else
+            {
+                wsHelpers.Cell(r2, 1).Value = "Es hat sich noch niemand als Helfer eingetragen.";
+            }
+        }
+        else
+        {
+            wsHelpers.Cell(2, 1).Value = "Es werden für diesen Event keine Helfer benötigt";
         }
 
         worksheet.Columns().AdjustToContents();
