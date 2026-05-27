@@ -65,7 +65,7 @@ a, .btn-link {
 
 
 .custom-navbar {
-    width: 100%;
+    max-width: 100%;
     display: grid;
     grid-template-columns: 1fr auto 1fr;
     align-items: center;
@@ -111,4 +111,26 @@ a, .btn-link {
     display: flex;
     justify-content: center; 
     align-items: center;
+}
+
+.survey-container{
+    padding: 1rem;
+}
+
+.survey-container h1{
+    font-size: clamp(1.8rem, 4vw, 3rem);
+}
+
+.survey-container h2 {
+    font-size: clamp(1.3rem, 3vw, 2rem);
+}
+
+.survey-container p{
+    font-size: clamp(0.9rem, 1.5vw, 1.1rem);
+    line-height: 1.6;
+}
+
+.responsive-img{
+    height: auto;
+    max-width:90%;
 }

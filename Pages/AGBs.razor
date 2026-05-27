@@ -7,20 +7,25 @@
 
 <h1>AGBs.</h1>
 
-@if (Documents.Count == 0)
-{
-    <p> Die AGBs werden gerade überarbeitet.</p>
-}
-else
-{
-    <p>Danke für Ihr interesse. Hier finden Sie unsere AGBs.</p>
 
-    @foreach (var doc in Documents)
+<div class="survey-container">
+    @if (Documents.Count == 0)
     {
-        <SurveyPrompt Title="@doc.Title" Content="@doc.Html" />
+        <p> Die AGBs werden gerade überarbeitet.</p>
     }
-    <img src="/Bilder/Ferienspass.png" alt="Fereienspasslogo" />
-}
+    else
+    {
+            <p>Danke für Ihr interesse. Hier finden Sie unsere AGBs.</p>
+
+            @foreach (var doc in Documents)
+            {
+                <SurveyPrompt Title="@doc.Title" Content="@doc.Html" />
+            }
+
+    }
+    <img src="/Bilder/Ferienspass.png" alt="Fereienspasslogo" class="responsive-img" />
+</div>
+
 
 
 @code {
