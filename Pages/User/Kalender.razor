@@ -21,6 +21,10 @@
 {
     <p>Momentan sind keine Events geplant.</p>
 }
+else if (myChildIds.Count == 0)
+{
+    <p>Bitte zuerst Kinder, Nutzerdaten und Notfallkontakte erfassen.</p>
+}
 else
 {
     <AuthorizeView Roles="Admin,Kursleiter">
@@ -266,6 +270,8 @@ else
                 .Where(c => c.ParentUserId == userId)
                 .Select(c => c.Id)
                 .ToListAsync();
+            // hier überprüfen, ob der Nuter die Daten, die Notfallkontakte schon erfasst hat.
+
 
             await LoadEvents();
             await LoadMyRegistrations();

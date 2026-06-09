@@ -65,7 +65,7 @@ else
     {
         <div style="border:1px solid #ddd; padding:10px; margin-bottom:8px;">
 
-            <b>Kind:</b> @entry.Child.Name <br />
+            <b>Kind:</b> @entry.Child.Name @entry.Child.ParentUser?.Nachname <br />
             Alter: @entry.Child.Alter <br />
             Klasse: @entry.Child.Klasse <br />
 
@@ -187,6 +187,7 @@ else
 
         registrations = await Db.EventChildren
             .Include(x => x.Child)
+                .ThenInclude(c => c.ParentUser)
             .Where(x => x.EventId == eventId)
             .ToListAsync();
 
@@ -246,7 +247,7 @@ else
             .Take(1)
             .ToList();
 
-            worksheet.Cell(row, 1).Value = entry.Child.Name;
+            worksheet.Cell(row, 1).Value = $"{entry.Child.Name} {entry.Child.ParentUser?.Nachname}".Trim();
             worksheet.Cell(row, 2).Value = entry.Child.Alter;
             worksheet.Cell(row, 3).Value =
                                             entry.Child.Klasse switch

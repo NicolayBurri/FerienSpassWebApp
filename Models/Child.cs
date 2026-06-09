@@ -6,6 +6,8 @@
 
         public string ParentUserId { get; set; } = default!;
 
+        public ApplicationUser? ParentUser { get; set; }
+
         public string Name { get; set; } = string.Empty;
         public int Alter {  get; set; }
 

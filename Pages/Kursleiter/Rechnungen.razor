@@ -41,7 +41,7 @@ else
                 <th>Datum</th>
                 <th>Total</th>
                 <th>Status</th>
-                <th>Ändern</th>
+                <AuthorizeView Roles="Admin"><th>Ändern</th></AuthorizeView>
             </tr>
         </thead>
 
@@ -76,16 +76,17 @@ else
                     </td>
 
                     <td>
+                        <AuthorizeView Roles="Admin">
+                            <select class="form-select"
+                                    value="@invoice.Status"
+                                    @onchange="e => ChangeStatus(invoice, e.Value?.ToString())">
 
-                        <select class="form-select"
-                                value="@invoice.Status"
-                                @onchange="e => ChangeStatus(invoice, e.Value?.ToString())">
+                                <option value="Open">Offen</option>
+                                <option value="Reminder">Mahnung</option>
+                                <option value="Paid">Bezahlt</option>
 
-                            <option value="Open">Offen</option>
-                            <option value="Reminder">Mahnung</option>
-                            <option value="Paid">Bezahlt</option>
-
-                        </select>
+                            </select>
+                        </AuthorizeView>
 
                     </td>
 
@@ -178,4 +179,6 @@ else
             _ => "-"
         };
     }
+
+    //hier noch eine überprüfung, ob für Events noch keine Rechnung erstellt wurde. Fehlt noch!!!
 }
