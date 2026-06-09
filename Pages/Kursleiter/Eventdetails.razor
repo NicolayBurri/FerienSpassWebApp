@@ -48,7 +48,7 @@ else
         @foreach (var kl in ev.Kursleiter)
         {
             <p>
-                @kl.User?.Vorname @kl.User?.Nachname
+                @kl.User?.Vorname @kl.User?.Nachname -> Telefonnummer: @kl.User?.Telefonnummer
              </p>
         }
     }
@@ -110,7 +110,7 @@ else
             @foreach (var driver in roles.Where(x => x.Role == RoleType.Driver))
             {
                 <p>
-                    @driver.User.Vorname @driver.User.Nachname - @driver.Seats Sitzplätze
+                    @driver.User.Vorname @driver.User.Nachname - @driver.Seats Sitzplätze -> Telefonnummer: @driver.User?.Telefonnummer
                 </p>
             }
         }
@@ -140,7 +140,7 @@ else
             @foreach (var helpernow in roles.Where(x => x.Role == RoleType.Helper))
             {
                 <p>
-                    @helpernow.User?.Vorname @helpernow.User?.Nachname
+                    @helpernow.User?.Vorname @helpernow.User?.Nachname -> Telefonnummer: @helpernow.User?.Telefonnummer
                 </p>
             }
         }
@@ -286,7 +286,8 @@ else
         {
 
             wsDrivers.Cell(1, 1).Value = "User";
-            wsDrivers.Cell(1, 2).Value = "Sitzplätze";
+            wsDrivers.Cell(1, 2).Value = "Telefonnummer";
+            wsDrivers.Cell(1, 3).Value = "Sitzplätze";
 
             int r = 2;
 
@@ -295,8 +296,9 @@ else
                 wsDrivers.Cell(1, 5).Value = $"Es fehlen noch: {missingDrivers} Fahrer"; 
                 foreach (var d in drivers)
                 {
-                    wsDrivers.Cell(r, 1).Value = d.User?.UserName;
-                    wsDrivers.Cell(r, 2).Value = d.Seats ?? 0;
+                    wsDrivers.Cell(r, 1).Value = $"{d.User?.UserName} {d.User?.Nachname}";
+                    wsDrivers.Cell(r, 2).Value = d.User?.Telefonnummer;
+                    wsDrivers.Cell(r, 3).Value = d.Seats ?? 0;
                     r++;
                 }
             }
@@ -321,6 +323,7 @@ else
         {
             wsDrivers.Cell(1, 5).Value = $"Es fehlen noch: {missingHelper} Betreuungspersonen / Helfer";
             wsHelpers.Cell(1, 1).Value = "User";
+            wsHelpers.Cell(1, 2).Value = "Telefonnummer";
 
             int r2 = 2;
 
@@ -329,7 +332,8 @@ else
 
                 foreach (var h in helpers)
                 {
-                    wsHelpers.Cell(r2, 1).Value = h.User?.UserName;
+                    wsHelpers.Cell(r2, 1).Value = $"{h.User?.UserName} {h.User?.Nachname}";
+                    wsHelpers.Cell(r2, 2).Value = h.User?.Telefonnummer;
                     r2++;
                 }
 
