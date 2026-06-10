@@ -109,6 +109,33 @@ else
                         Mindest- und Maximalkapazität:
                         @ev.MinKinder - 
                         @ev.MaxKinder Kinder
+
+                    </p>
+
+
+                    <p>
+
+                        @if (availabilityByEvent.TryGetValue(ev.Id, out var av))
+                        {
+                            @if (av.FreiePlaetze > 0)
+                            {
+                            <p style="color:green">
+                                Noch @av.FreiePlaetze Plätze verfügbar
+                            </p>
+                            }
+                            else if (av.FreieWartelistePlaetze > 0)
+                            {
+                            <p style="color:orange">
+                                Event voll – noch @av.FreieWartelistePlaetze Wartelisteplätze verfügbar
+                            </p>
+                            }
+                            else
+                            {
+                            <p style="color:red">
+                                AUSGEBUCHT
+                            </p>
+                            }
+                        }
                     </p>
 
                     <p>Altersbeschränkung:
@@ -124,6 +151,10 @@ else
                         {
                             <p>@kl.User?.Vorname @kl.User?.Nachname</p>
                         }
+                    }
+                    else
+                    {
+                        <p>Es ist noch kein Kursleiter definiert.</p>
                     }
 
 
@@ -242,6 +273,7 @@ else
     private List<Event> events = new();
     private Dictionary<DateTime, List<Event>> eventsByDay = new();
     private Dictionary<int, List<EventRoleAssignment>> myRolesByEvent = new();
+    private Dictionary<int, EventAvailability> availabilityByEvent = new();
 
     private EventKategorie? selectedKategorie;
     private int? filterAlter;
@@ -250,6 +282,13 @@ else
 
     private string? userId;
     private List<int> myChildIds = new();
+
+
+    private class EventAvailability
+    {
+        public int FreiePlaetze { get; set; }
+        public int FreieWartelistePlaetze { get; set; }
+    }
 
 
     protected override async Task OnInitializedAsync()
@@ -317,6 +356,34 @@ else
             .ToListAsync();
 
         events = result;
+
+        var eventIds = events.Select(e => e.Id).ToList();
+
+        var counts = await Db.EventChildren
+            .AsNoTracking()
+            .Where(x => eventIds.Contains(x.EventId))
+            .GroupBy(x => x.EventId)
+            .Select(g => new
+            {
+                EventId = g.Key,
+                Confirmed = g.Count(x => x.Status == EnrollmentStatus.Confirmed),
+                Waiting = g.Count(x => x.Status == EnrollmentStatus.WaitingList)
+            })
+            .ToListAsync();
+
+        availabilityByEvent = events.ToDictionary(ev => ev.Id, ev =>
+        {
+            var c = counts.FirstOrDefault(x => x.EventId == ev.Id);
+
+            var confirmed = c?.Confirmed ?? 0;
+            var waiting = c?.Waiting ?? 0;
+
+            return new EventAvailability
+                {
+                    FreiePlaetze = Math.Max(0, ev.MaxKinder - confirmed),
+                    FreieWartelistePlaetze = Math.Max(0, ev.WaitlisteLimit - waiting)
+                };
+        });
 
         eventsByDay = events
             .Where(x => x.StartZeit.HasValue)
