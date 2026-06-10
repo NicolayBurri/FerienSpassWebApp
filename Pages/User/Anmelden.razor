@@ -110,6 +110,12 @@ else
                 <input type="checkbox" @bind="willHelp" />
                 Ich helfe als Betreuungsperson.
             </label>
+
+            @if (willHelp)
+            {
+                <br /> <br />
+                <p style ="color:orange">Eine Woche vor dem Eventbeginn werden sich die Kursleiter mit Details bei Ihnen melden.</p>
+            }
         }
 
         <br /><br />
@@ -127,9 +133,13 @@ else
 
             @if (willDrive)
             {
+                <p>Verfügbare Sitzplätze: </p>
                 <input type="number"
                        placeholder="Freie Sitzplätze"
                        @bind="driverSeats" />
+
+                <br /> <br />
+                <p style="color:orange">Eine Woche vor dem Eventbeginn werden sich die Kursleiter mit Details bei Ihnen melden.</p>
             }
         }
 
