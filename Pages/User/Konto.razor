@@ -4,10 +4,12 @@
 @using FerienspassWebApp.Models
 @using FerienspassWebApp.Data
 @using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Components.Authorization
 
 @inject UserManager<ApplicationUser> UserManager
 @inject AuthenticationStateProvider AuthStateProvider
 @inject ApplicationDbContext Db
+@inject NavigationManager Navigation
 
 <h2>Konto</h2>
 
@@ -102,9 +104,14 @@ else
 
         var result = await UserManager.UpdateAsync(user);
 
-        message = result.Succeeded
-            ? "Gespeichert!"
-            : "Fehler beim Speichern";
+        if (result.Succeeded)
+        {
+            Navigation.NavigateTo("/", forceLoad: true);
+        }
+        else
+        {
+            message = "Fehler beim Speichern";
+        }
     }
 
     async Task AddContact()
