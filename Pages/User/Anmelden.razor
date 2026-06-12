@@ -76,6 +76,34 @@ else
 
         </div>
 
+        @if (!string.IsNullOrEmpty(ev.DocumentUrl))
+        {
+            <div style="
+                margin-top:15px;
+                padding:15px;
+                border:1px solid #f0ad;
+                border-radius:8px;
+                background-color:gray;">
+                
+                <p style="margin-bottom:10px;">
+                    <b>Wichtig:</b> Für dieses Event  ist  ein Dokument hinterlegt. Bitte laden Sie dieses herunter, füllen es vollständig aus und bringen es unterschrieben am Eventtag mit. 
+                    Ohne dieses Dokument darf Ihr Kind am Event nicht teilnehmen. 
+                </p>
+
+                <a class="btn btn-warning"
+                    href="/@ev.DocumentUrl"
+                    download>
+                    Dokument herunterladen
+                </a>
+
+                <a class="btn btn-secondary"
+                    href="/@ev.DocumentUrl"
+                    target="_blank">
+                    Dokument ansehen
+                </a>
+            </div>
+        }
+
         <hr />
 
         @if (ev.IsFull)

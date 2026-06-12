@@ -42,6 +42,8 @@ namespace FerienspassWebApp.Models
 
         public string? BildUrl { get; set; }
 
+        public string? DocumentUrl { get; set; }
+
         public bool IsArchived { get; set; }
 
         public int? CopiedFromEventId { get; set; }

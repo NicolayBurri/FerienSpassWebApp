@@ -3,6 +3,7 @@
 @using FerienspassWebApp.Data
 @using FerienspassWebApp.Models
 @using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Components.Forms
 
 @inject ApplicationDbContext Db
 @inject NavigationManager Nav
@@ -137,6 +138,19 @@ else
         <input @bind="ev.BildUrl"
                placeholder="Bild URL" />
 
+        <label>Dokument</label>
+        @if (!string.IsNullOrEmpty(ev.DocumentUrl))
+        {
+            <p>Aktuelles Dokument:</p>
+            <a href="/@ev.DocumentUrl" target="_blank">Dokument öffnen</a>
+        }
+
+        <div style"border:2px dashed #ccc; padding:20px; text-align:center;">
+            <p>Neues Dokument hochladen</p>
+            <InputFile OnChange="HandleDocUpload"
+                  accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
+        </div>
+
         <label>
             <input type="checkbox"
                    @bind="ev.IsArchived" />
@@ -253,6 +267,8 @@ else
 
                 BildUrl = ev.BildUrl,
 
+                DocumentUrl = ev.DocumentUrl,
+
                 StartZeit = null,
 
                 EndeZeit = null,
@@ -296,5 +312,57 @@ else
         kursleiter.Remove(kl);
         Db.EventKursleiter.Remove(kl);
         await Db.SaveChangesAsync();
+    }
+
+    private async Task HandleDocUpload(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+
+        if (file == null)
+            return;
+
+        var allowedContentTypes = new[]
+        {
+        "application/pdf",
+        "application/msword",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    };
+
+        var allowedExtensions = new[]
+        {
+        ".pdf",
+        ".doc",
+        ".docx"
+    };
+
+        var extension = Path.GetExtension(file.Name).ToLowerInvariant();
+
+        if (!allowedContentTypes.Contains(file.ContentType) ||
+            !allowedExtensions.Contains(extension))
+        {
+            msg = "Nur PDF- oder Word-Dateien erlaubt!";
+            return;
+        }
+
+        var folderPath = Path.Combine("wwwroot", "docs", "events");
+
+        if (!Directory.Exists(folderPath))
+            Directory.CreateDirectory(folderPath);
+
+        var safeName = (ev?.Eventname ?? "event").Replace(" ", "_");
+
+        var fileName = $"{safeName}_{DateTime.Now.Ticks}{extension}";
+        var fullPath = Path.Combine(folderPath, fileName);
+
+        using (var stream = new FileStream(fullPath, FileMode.Create))
+        {
+            await file.OpenReadStream(5 * 1024 * 1024).CopyToAsync(stream);
+        }
+
+        if (ev != null)
+        {
+            ev.DocumentUrl = $"docs/events/{fileName}";
+            msg = "Dokument hochgeladen!";
+        }
     }
 }

@@ -102,7 +102,8 @@
 
     <div style="border:2px dashed #ccc; padding:20px; text-align:center;">
         <p>Bild hier hineinziehen oder klicken</p>
-        <InputFile OnChange="HandleFileUpload" />
+        <InputFile OnChange="HandleFileUpload" 
+            accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"/>
     </div>
 
     @if (!string.IsNullOrEmpty(ev.BildUrl))
@@ -114,6 +115,20 @@
     <hr />
 
     <textarea placeholder="Beschreibung" @bind="ev.Beschreibung"></textarea>
+
+    <hr />
+
+    <div style="border:2px dashed #ccc; padding:20px; text-align:center;">
+        <p>Dokument hier hineinziehen oder klicken</p>
+        <InputFile OnChange="HandleDocUpload" />
+    </div>
+
+    @if (!string.IsNullOrEmpty(ev.DocumentUrl))
+    {
+        <p>Dokument:</p>
+        <a href="@ev.DocumentUrl" target="_blank">Dokument öffnen</a>
+    }
+
 
     <button @onclick="Save">Speichern</button>
 
@@ -170,6 +185,57 @@
 
         ev.BildUrl = $"images/events/{fileName}";
     }
+
+    private async Task HandleDocUpload(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+
+        if (file == null)
+            return;
+
+        var allowedContentTypes = new[]{
+            "application/pdf",
+            "application/msword",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        };
+
+        var allowedExtensions = new[]
+        {
+            ".pdf",
+            ".doc",
+            ".docx"
+        };
+
+        var extension = Path.GetExtension(file.Name).ToLowerInvariant();
+
+        if (!allowedContentTypes.Contains(file.ContentType) ||
+            !allowedExtensions.Contains(extension))
+        {
+            msg = "Nur PDF- oder Word-Dateien erlaubt!";
+            return;
+        }
+
+        var folderPath = Path.Combine("wwwroot", "docs", "events");
+
+        if (!Directory.Exists(folderPath))
+            Directory.CreateDirectory(folderPath);
+
+        var safeName = (ev.Eventname ?? "event").Replace(" ", "_");
+
+        var fileName = $"{safeName}_{DateTime.Now.Ticks}{extension}";
+
+        var fullPath = Path.Combine(folderPath, fileName);
+
+        using (var stream = new FileStream(fullPath, FileMode.Create))
+        {
+            await file.OpenReadStream(5 * 1024 * 1024).CopyToAsync(stream); // max 5MB
+        }
+
+        ev.DocumentUrl = $"docs/events/{fileName}";
+        msg = "Dokument hochgeladen!";
+    }
+
+    
 
     private async Task<List<string>> CheckKursleiterConflicts()
     {
