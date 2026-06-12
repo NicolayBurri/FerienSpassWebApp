@@ -18,7 +18,7 @@ jobs:
           dotnet-version: 8.0.x
 
       - name: Publish
-        run: dotnet publish FerienspassWebApp.csproj -c Release -o publish
+        run: dotnet publish FerienspassWebApp.csproj -c Release -o publish /p:Version=1.0.${{ github.run_number}}
 
       - name: FTP Deploy
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
@@ -31,3 +31,4 @@ jobs:
           local-dir: publish/
           server-dir: /test/
           security: loose
+          state-name: .ftp-deploy-sync-state-test.json
