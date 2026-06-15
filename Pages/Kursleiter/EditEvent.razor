@@ -34,7 +34,7 @@ else
 
         @foreach (var kl in kursleiter)
         {
-            <div style="display:flex; gap:10px; align-items:center;">
+            <div @key="kl" style="display:flex; gap:10px; align-items:center;">
                 <select @bind="kl.UserId">
                     @foreach (var u in users)
                     {
@@ -223,6 +223,24 @@ else
         if (DateTime.TryParse(endText, out var e))
             ev.EndeZeit = e;
 
+        var oldKursleiter = await Db.EventKursleiter
+            .Where(x => x.EventId == ev.Id)
+            .ToListAsync();
+
+        Db.EventKursleiter.RemoveRange(oldKursleiter);
+
+        foreach (var kl in kursleiter)
+        {
+            if (!string.IsNullOrEmpty(kl.UserId))
+            {
+                Db.EventKursleiter.Add(new EventKursleiter
+                    {
+                        EventId = ev.Id,
+                        UserId = kl.UserId
+                    });
+            }
+        }
+
         await Db.SaveChangesAsync();
 
         msg = "Gespeichert!";
@@ -299,11 +317,20 @@ else
         Nav.NavigateTo($"/kursleiter/events");
     }
 
-    async Task AddKursleiter()
+    void AddKursleiter()
     {
+        var firstUser = users.FirstOrDefault();
+
+        if (firstUser == null)
+        {
+            msg = "Keine Benutzer vorhanden.";
+            return;
+        }
+
         kursleiter.Add(new EventKursleiter
             {
-                EventId = eventId
+                EventId = eventId,
+                UserId = firstUser.Id
             });
     }
 
