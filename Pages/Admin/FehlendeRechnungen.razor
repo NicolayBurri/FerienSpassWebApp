@@ -1,0 +1,91 @@
+﻿@page "/admin/fehlende-rechnungen"
+
+@using Microsoft.EntityFrameworkCore
+@using FerienspassWebApp.Data
+@using FerienspassWebApp.Models
+
+@inject ApplicationDbContext Db
+
+<h3>Kinder ohne erstellte Rechnung</h3>
+
+@if (isLoading)
+{
+    <p>Laden...</p>
+}
+else if (!items.Any())
+{
+    <p>Alle bestätigten Kursanmeldungen wurden bereits verrechnet.</p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Kind</th>
+                <th>Kurs</th>
+                <th>Preis</th>
+                <th>Aktionen</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var item in items)
+            {
+                <tr>
+                    <td>@item.Child.Name @item.Child.ParentUser?.Nachname</td>
+                    <td>@item.Event.Eventname</td>
+                    <td>CHF @item.Event.price</td>
+                    <td>
+                        <a class="btn btn-warning btn-sm"
+                           href="@CreateMailLink(item)">
+                            Email generieren
+                        </a>
+
+                        <button class="btn btn-danger btn-sm"
+                                @onclick="() => RemoveChildFromCourse(item)">
+                            Kind aus Kurs löschen
+                        </button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private bool isLoading = true;
+    private List<EventChild> items = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        items = await Db.EventChildren
+            .Include(x => x.Child)
+            .Include(x => x.Event)
+            .Where(x =>
+                x.Status == EnrollmentStatus.Confirmed &&
+                !x.IsInvoiced)
+            .ToListAsync();
+
+        isLoading = false;
+    }
+
+    private string CreateMailLink(EventChild item)
+    {
+        var subject = Uri.EscapeDataString("Bitte Rechnung erstellen");
+
+        var body = Uri.EscapeDataString(
+            $"Bitte die Rechnung für folgendes Kind erstellen:\n\n" +
+            $"Kind: {item.Child.Name} {item.Child.ParentUser?.Nachname}\n" +
+            $"Kurs: {item.Event.Eventname}\n" +
+            $"Betrag: CHF {item.Event.price}");
+
+        return $"mailto:?subject={subject}&body={body}";
+    }
+
+    private async Task RemoveChildFromCourse(EventChild item)
+    {
+        Db.EventChildren.Remove(item);
+        await Db.SaveChangesAsync();
+
+        items.Remove(item);
+    }
+}
