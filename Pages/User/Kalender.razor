@@ -69,11 +69,41 @@ else
     <br />
     <br />
 
-    @foreach (var group in eventsByDay)
+    @if (!days.Any())
     {
-        <h2>@group.Key.ToString("dddd dd.MM")</h2>
+        <p>Keine Events gefunden.</p>
+    }
+    else
+    {
+        <div style="margin-bottom:20px; display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
 
-        @foreach (var ev in group.Value)
+            <button class="btn btn-secondary"
+                    disabled="@(currentDayIndex == 0)"
+                    @onclick="PreviousDay">
+                ← Vorheriger Tag
+            </button>
+
+            @for (int i = 0; i < days.Count; i++)
+            {
+                var index = i;
+
+                <button class="btn @(currentDayIndex == index ? "btn-primary" : "btn-outline-primary")"
+                        @onclick="() => GoToDay(index)">
+                    @days[index].ToString("dd.MM")
+                </button>
+            }
+
+            <button class="btn btn-secondary"
+                    disabled="@(currentDayIndex == days.Count - 1)"
+                    @onclick="NextDay">
+                Nächster Tag →
+            </button>
+
+        </div>
+
+        <h2>@selectedDay?.ToString("dddd dd.MM.yyyy")</h2>
+
+        @foreach (var ev in eventsToday)
         {
             <div style="border:1px solid #ccc; padding:8px; margin-bottom:5px; display:flex; align-items:flex-start;">
 
@@ -81,71 +111,56 @@ else
 
                     <h3>Event: @ev.Eventname</h3><br />
 
-                    <p> Zeit:
-                    @ev.StartZeit?.ToString("HH:mm") - @ev.EndeZeit?.ToString("HH:mm")
+                    <p>
+                        Zeit:
+                        @ev.StartZeit?.ToString("HH:mm") - @ev.EndeZeit?.ToString("HH:mm")
                     </p>
 
-                    <p>Kategorie:
-                        @ev.Kategorie
-                    </p>
+                    <p>Kategorie: @ev.Kategorie</p>
 
-                    <p>Beschreibung:
-                        @ev.Beschreibung
-                    </p>
+                    <p>Beschreibung: @ev.Beschreibung</p>
 
-                    <p>Treffpunkt:
-                        @ev.Treffpunkt
-                    </p>
+                    <p>Treffpunkt: @ev.Treffpunkt</p>
 
-                    <p>Eventlocation:
-                        @ev.Location
-                    </p>
+                    <p>Eventlocation: @ev.Location</p>
 
-                    <p>Preis:
-                        @ev.price CHF
-                    </p>
+                    <p>Preis: @ev.price CHF</p>
 
                     <p>
                         Mindest- und Maximalkapazität:
-                        @ev.MinKinder - 
-                        @ev.MaxKinder Kinder
-
+                        @ev.MinKinder - @ev.MaxKinder Kinder
                     </p>
 
-
-                    <p>
-
-                        @if (availabilityByEvent.TryGetValue(ev.Id, out var av))
+                    @if (availabilityByEvent.TryGetValue(ev.Id, out var av))
+                    {
+                        @if (av.FreiePlaetze > 0)
                         {
-                            @if (av.FreiePlaetze > 0)
-                            {
                             <p style="color:green">
                                 Noch @av.FreiePlaetze Plätze verfügbar
                             </p>
-                            }
-                            else if (av.FreieWartelistePlaetze > 0)
-                            {
+                        }
+                        else if (av.FreieWartelistePlaetze > 0)
+                        {
                             <p style="color:orange">
                                 Event voll – noch @av.FreieWartelistePlaetze Wartelisteplätze verfügbar
                             </p>
-                            }
-                            else
-                            {
+                        }
+                        else
+                        {
                             <p style="color:red">
                                 AUSGEBUCHT
                             </p>
-                            }
                         }
+                    }
+
+                    <p>
+                        Altersbeschränkung:
+                        @ev.AlterMin - @ev.AlterMax Jahre alt
                     </p>
 
-                    <p>Altersbeschränkung:
-                        @ev.AlterMin -
-                        @ev.AlterMax Jahre alt
-                    </p>
+                    <h4>Kursleiter</h4>
 
-                    <h4>Kursleiter </h4>
-
-                    @if (ev?.Kursleiter?.Any() == true)
+                    @if (ev.Kursleiter?.Any() == true)
                     {
                         @foreach (var kl in ev.Kursleiter)
                         {
@@ -157,41 +172,29 @@ else
                         <p>Es ist noch kein Kursleiter definiert.</p>
                     }
 
-
-
-                    <button class="btn btn-sm btn-primary" @onclick="() => GoToEvent(ev.Id)"
+                    <button class="btn btn-sm btn-primary"
+                            @onclick="() => GoToEvent(ev.Id)"
                             disabled="@ev.IsFull">
                         @(ev.IsFull ? "Ausgebucht" : "Anmelden")
                     </button>
 
-                    <br/>
-
-                    @if (ev.IsFull)
-                    {
-                        <span style="color:red">AUSGEBUCHT</span>
-                    }
-
-                    <br />
-
                     @if (myRegsByEvent.TryGetValue(ev.Id, out var myRegs) && myRegs.Any())
                     {
-                        <div style="margin-top:8px; gap:10px;">
+                        <div style="margin-top:8px;">
                             <b>Meine Kinder:</b>
 
                             <ul>
                                 @foreach (var r in myRegs)
                                 {
                                     <li>
-                                       
-
                                         <div style="display:flex; gap:20px;">
-                                            <p>Kind: </p>
+                                            <p>Kind:</p>
 
-                                            @r.Child.Name 
-                                            
-                                            <p> - </p>
+                                            @r.Child.Name
 
-                                            <p>Status: </p>
+                                            <p>-</p>
+
+                                            <p>Status:</p>
 
                                             @if (r.Status == EnrollmentStatus.Confirmed)
                                             {
@@ -202,14 +205,12 @@ else
                                                 <span style="color:orange">Warteliste</span>
                                             }
 
-                                            <button style="max-height:30px; font-size:14px; line-height:5px;" class="btn btn-warning" @onclick="() => UnregisterChild(ev.Id, r.ChildId)">
+                                            <button style="max-height:30px; font-size:14px; line-height:5px;"
+                                                    class="btn btn-warning"
+                                                    @onclick="() => UnregisterChild(ev.Id, r.ChildId)">
                                                 Abmelden
                                             </button>
-                                            <br/>
-
-                                            <br />
                                         </div>
-                                   
                                     </li>
                                 }
                             </ul>
@@ -240,7 +241,9 @@ else
                                                 <span>Betreuungsperson</span>
                                             }
 
-                                            <button style="height:30px; font-size:15px; line-height:5px;" class="btn btn-warning" @onclick="() => UnregisterRole(r.Id)">
+                                            <button style="height:30px; font-size:15px; line-height:5px;"
+                                                    class="btn btn-warning"
+                                                    @onclick="() => UnregisterRole(r.Id)">
                                                 Abmelden
                                             </button>
                                         </div>
@@ -269,8 +272,12 @@ else
     private bool isLoading = true;
     private bool showDateFilter = false;
     private DateTime? filterDatum;
+    private int currentDayIndex = 0;
 
     private List<Event> events = new();
+    private List<DateTime> days = new();
+
+
     private Dictionary<DateTime, List<Event>> eventsByDay = new();
     private Dictionary<int, List<EventRoleAssignment>> myRolesByEvent = new();
     private Dictionary<int, EventAvailability> availabilityByEvent = new();
@@ -290,6 +297,17 @@ else
         public int FreieWartelistePlaetze { get; set; }
     }
 
+    private DateTime? selectedDay =>
+        days.Any() ? days[currentDayIndex] : null;
+
+    private List<Event> eventsToday =>
+        selectedDay == null
+        ? new List<Event>()
+        : events
+            .Where(e => e.StartZeit.HasValue &&
+                    e.StartZeit.Value.Date == selectedDay.Value.Date)
+            .OrderBy(e => e.StartZeit)
+            .ToList();
 
     protected override async Task OnInitializedAsync()
     {
@@ -385,10 +403,17 @@ else
                 };
         });
 
-        eventsByDay = events
+        days = events
             .Where(x => x.StartZeit.HasValue)
-            .GroupBy(x => x.StartZeit.Value.Date)
-            .ToDictionary(g => g.Key, g => g.ToList());
+            .Select(x => x.StartZeit!.Value.Date)
+            .Distinct()
+            .OrderBy(x => x)
+            .ToList();
+
+        if (currentDayIndex >= days.Count)
+        {
+            currentDayIndex = 0;
+        }
     }
 
     private async Task LoadMyRegistrations()
@@ -581,5 +606,29 @@ else
         }
 
         await LoadEvents();
+    }
+
+    private void NextDay()
+    {
+        if (currentDayIndex < days.Count - 1)
+        {
+            currentDayIndex++;
+        }
+    }
+
+    private void PreviousDay()
+    {
+        if (currentDayIndex > 0)
+        {
+            currentDayIndex--;
+        }
+    }
+
+    private void GoToDay(int index)
+    {
+        if (index >= 0 && index < days.Count)
+        {
+            currentDayIndex = index;
+        }
     }
 }
