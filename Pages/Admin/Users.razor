@@ -22,7 +22,7 @@ else
             </tr>
         </thead>
         <tbody>
-            @foreach (var user in users)
+            @foreach (var user in pagedUsers)
             {
                 <tr>
                     <td>@user.Email</td>
@@ -50,20 +50,68 @@ else
             }
         </tbody>
     </table>
+
+    @if (totalPages > 1)
+    {
+        <div class="mt-3">
+
+            <button class="btn btn-secondary"
+                    @onclick="PreviousPage"
+                    disabled="@(currentPage == 1)">
+                ← Zurück
+            </button>
+
+            @for (int i = 1; i <= totalPages; i++)
+            {
+                var pagenumber = i;
+
+                <button class="btn @(pagenumber == currentPage ? "btn-primary" : "btn-outline-primary")"
+                        @onclick="() => GoToPage(pagenumber)">
+                    @pagenumber
+                </button>
+            }
+
+            <button class="btn btn-secondary"
+                    @onclick="NextPage"
+                    disabled="@(currentPage == totalPages)">
+                Weiter →
+            </button>
+
+        </div>
+    }
 }
 
 @code {
     List<ApplicationUser>? users;
     Dictionary<string, IList<string>> userRoles = new();
+    private int currentPage = 1;
+    private const int pageSize = 20;
+
+    private List<ApplicationUser> pagedUsers =>
+        users?
+            .Skip((currentPage - 1) * pageSize)
+            .Take(pageSize)
+            .ToList()
+        ?? new();
+
+    private int totalPages =>
+        users == null
+            ? 0
+            : (int)Math.Ceiling(users.Count / (double)pageSize);
 
     protected override async Task OnInitializedAsync()
     {
-        users = UserManager.Users.ToList();
+        users = UserManager.Users
+            .OrderBy(x => x.Email)
+            .ToList();
 
         foreach (var user in users)
         {
             userRoles[user.Id] = await UserManager.GetRolesAsync(user);
         }
+
+        if (currentPage > totalPages)
+            currentPage = totalPages == 0 ? 1 : totalPages;
     }
 
     async Task MakeAdmin(ApplicationUser user)
@@ -93,5 +141,22 @@ else
         await UserManager.AddToRoleAsync(user, role);
 
         await OnInitializedAsync();
+    }
+
+    void GoToPage(int page)
+    {
+        currentPage = page;
+    }
+
+    void NextPage()
+    {
+        if (currentPage < totalPages)
+            currentPage++;
+    }
+
+    void PreviousPage()
+    {
+        if (currentPage > 1)
+            currentPage--;
     }
 }

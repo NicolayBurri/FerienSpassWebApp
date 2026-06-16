@@ -1,4 +1,5 @@
 ﻿@page "/Kalender"
+
 @inject ApplicationDbContext Db
 
 <PageTitle>Event Kalender</PageTitle>
@@ -9,11 +10,41 @@
 
 <h1>Event Kalender</h1>
 
-@foreach (var group in eventsByDay)
+@if (!days.Any())
 {
-    <h2>@group.Key.ToString("dddd dd.MM")</h2>
+    <p>Keine Events gefunden.</p>
+}
+else
+{
+    <div style="margin-bottom:20px; display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
 
-    @foreach (var ev in group.Value)
+        <button class="btn btn-secondary"
+                disabled="@(currentDayIndex == 0)"
+                @onclick="PreviousDay">
+            ← Vorheriger Tag
+        </button>
+
+        @for (int i = 0; i < days.Count; i++)
+        {
+            var index = i;
+
+            <button class="btn @(currentDayIndex == index ? "btn-primary" : "btn-outline-primary")"
+                    @onclick="() => GoToDay(index)">
+                @days[index].ToString("dd.MM")
+            </button>
+        }
+
+        <button class="btn btn-secondary"
+                disabled="@(currentDayIndex == days.Count - 1)"
+                @onclick="NextDay">
+            Nächster Tag →
+        </button>
+
+    </div>
+
+    <h2>@selectedDay?.ToString("dddd dd.MM.yyyy")</h2>
+
+    @foreach (var ev in eventsToday)
     {
         <div style="border:1px solid #ccc; padding:8px; margin-bottom:5px; display:flex; align-items:flex-start;">
 
@@ -26,52 +57,38 @@
                     @ev.StartZeit?.ToString("HH:mm") - @ev.EndeZeit?.ToString("HH:mm")
                 </p>
 
-                <p>
-                    Kategorie:
-                    @ev.Kategorie
-                </p>
+                <p>Kategorie: @ev.Kategorie</p>
 
-                <p>
-                    Beschreibung:
-                    @ev.Beschreibung
-                </p>
+                <p>Beschreibung: @ev.Beschreibung</p>
 
-                <p>
-                    Treffpunkt:
-                    @ev.Treffpunkt
-                </p>
+                <p>Treffpunkt: @ev.Treffpunkt</p>
 
-                <p>
-                    Eventlocation:
-                    @ev.Location
-                </p>
+                <p>Eventlocation: @ev.Location</p>
 
-                <p>
-                    Preis:
-                    @ev.price CHF
-                </p>
+                <p>Preis: @ev.price CHF</p>
 
                 <p>
                     Mindest- und Maximalkapazität:
-                    @ev.MinKinder -
-                    @ev.MaxKinder Kinder
+                    @ev.MinKinder - @ev.MaxKinder Kinder
                 </p>
 
                 <p>
                     Altersbeschränkung:
-                    @ev.AlterMin -
-                    @ev.AlterMax Jahre alt
+                    @ev.AlterMin - @ev.AlterMax Jahre alt
                 </p>
 
-                <h4>Kursleiter </h4>
+                <h4>Kursleiter</h4>
 
-                @if (ev?.Kursleiter?.Any() == true)
+                @if (ev.Kursleiter?.Any() == true)
                 {
                     @foreach (var kl in ev.Kursleiter)
                     {
-
                         <p>@kl.User?.Vorname @kl.User?.Nachname</p>
                     }
+                }
+                else
+                {
+                    <p>Es ist noch kein Kursleiter definiert.</p>
                 }
             </div>
 
@@ -89,7 +106,21 @@
 
 @code {
     private List<Event> events = new();
-    private Dictionary<DateTime, List<Event>> eventsByDay = new();
+
+    private List<DateTime> days = new();
+    private int currentDayIndex = 0;
+
+    private DateTime? selectedDay =>
+        days.Any() ? days[currentDayIndex] : null;
+
+    private List<Event> eventsToday =>
+        selectedDay == null
+            ? new List<Event>()
+            : events
+                .Where(e => e.StartZeit.HasValue &&
+                            e.StartZeit.Value.Date == selectedDay.Value.Date)
+                .OrderBy(e => e.StartZeit)
+                .ToList();
 
     protected override async Task OnInitializedAsync()
     {
@@ -104,10 +135,35 @@
             .OrderBy(x => x.StartZeit)
             .ToListAsync();
 
-        eventsByDay = events
+        days = events
             .Where(x => x.StartZeit.HasValue)
-            .GroupBy(x => x.StartZeit!.Value.Date)
-            .ToDictionary(g => g.Key, g => g.ToList());
+            .Select(x => x.StartZeit!.Value.Date)
+            .Distinct()
+            .OrderBy(x => x)
+            .ToList();
     }
 
+    private void NextDay()
+    {
+        if (currentDayIndex < days.Count - 1)
+        {
+            currentDayIndex++;
+        }
+    }
+
+    private void PreviousDay()
+    {
+        if (currentDayIndex > 0)
+        {
+            currentDayIndex--;
+        }
+    }
+
+    private void GoToDay(int index)
+    {
+        if (index >= 0 && index < days.Count)
+        {
+            currentDayIndex = index;
+        }
+    }
 }

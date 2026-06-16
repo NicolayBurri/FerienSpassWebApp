@@ -15,7 +15,7 @@
 }
 else
 {
-    @foreach (var invoice in invoices)
+    @foreach (var invoice in pagedInvoices)
     {
         <div style="border:1px solid #ccc; padding:15px; margin-bottom:10px; border-radius:10px;">
 
@@ -54,11 +54,51 @@ else
 
         </div>
     }
+    @if (totalPages > 1)
+    {
+        <div class="mt-3" style="display:flex; gap:8px; flex-wrap:wrap;">
+
+            <button class="btn btn-secondary"
+                    @onclick="PreviousPage"
+                    disabled="@(currentPage == 1)">
+                ← Zurück
+            </button>
+
+            @for (int i = 1; i <= totalPages; i++)
+            {
+                var pageNumber = i;
+
+                <button class="btn @(pageNumber == currentPage ? "btn-primary" : "btn-outline-primary")"
+                        @onclick="() => GoToPage(pageNumber)">
+                    @pageNumber
+                </button>
+            }
+
+            <button class="btn btn-secondary"
+                    @onclick="NextPage"
+                    disabled="@(currentPage == totalPages)">
+                Weiter →
+            </button>
+
+        </div>
+    }
 }
+
 
 @code {
 
     private List<Invoice> invoices = new();
+    private int currentPage = 1;
+    private const int pageSize = 10;
+
+    private List<Invoice> pagedInvoices =>
+        invoices
+            .Skip((currentPage - 1) * pageSize)
+            .Take(pageSize)
+            .ToList();
+
+    private int totalPages =>
+        (int)Math.Ceiling(invoices.Count / (double)pageSize);
 
     protected override async Task OnInitializedAsync()
     {
@@ -72,6 +112,11 @@ else
             .Where(x => x.ParentUserId == userId)
             .OrderByDescending(x => x.CreatedAt)
             .ToListAsync();
+
+        if (currentPage > totalPages)
+        {
+            currentPage = totalPages == 0 ? 1 : totalPages;
+        }
     }
 
     string GetColor(InvoiceStatus status)
@@ -94,5 +139,22 @@ else
             InvoiceStatus.Paid => "Bezahlt",
             _ => "-"
         };
+    }
+
+    void GoToPage(int page)
+    {
+        currentPage = page;
+    }
+
+    void NextPage()
+    {
+        if (currentPage < totalPages)
+            currentPage++;
+    }
+
+    void PreviousPage()
+    {
+        if (currentPage > 1)
+            currentPage--;
     }
 }

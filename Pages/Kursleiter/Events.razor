@@ -2,15 +2,17 @@
 
 @using FerienspassWebApp.Data
 @using FerienspassWebApp.Models
+
 @inject ApplicationDbContext Db
 @inject NavigationManager Nav
 
 <h3>Event Verwaltung</h3>
 
-@foreach (var ev in events)
+@foreach (var ev in pagedEvents)
 {
     <div style="border:1px solid #ccc; padding:10px; margin-bottom:10px;">
         <b>@ev.Eventname</b><br />
+
         @ev.StartZeit?.ToString("dd.MM.yyyy HH:mm") -
         @ev.EndeZeit?.ToString("dd.MM.yyyy HH:mm")<br />
 
@@ -24,20 +26,91 @@
         {
             <br />
             <br />
-            <button style="color:red !important;" @onclick="() => ResetEvent(ev.Id)">Anmeldungen zurücksetzen</button>
+            <button style="color:red !important;"
+                    @onclick="() => ResetEvent(ev.Id)">
+                Anmeldungen zurücksetzen
+            </button>
         }
+    </div>
+}
+
+@if (totalPages > 1)
+{
+    <div class="mt-3" style="display:flex; gap:8px; flex-wrap:wrap;">
+
+        <button class="btn btn-secondary"
+                @onclick="PreviousPage"
+                disabled="@(currentPage == 1)">
+            ← Zurück
+        </button>
+
+        @for (int i = 1; i <= totalPages; i++)
+        {
+            var pageNumber = i;
+
+            <button class="btn @(pageNumber == currentPage ? "btn-primary" : "btn-outline-primary")"
+                    @onclick="() => GoToPage(pageNumber)">
+                @pageNumber
+            </button>
+        }
+
+        <button class="btn btn-secondary"
+                @onclick="NextPage"
+                disabled="@(currentPage == totalPages)">
+            Weiter →
+        </button>
+
     </div>
 }
 
 @code {
     private List<Event> events = new();
 
+    private int currentPage = 1;
+    private const int pageSize = 20;
+
+    private List<Event> pagedEvents =>
+        events
+            .Skip((currentPage - 1) * pageSize)
+            .Take(pageSize)
+            .ToList();
+
+    private int totalPages =>
+        (int)Math.Ceiling(events.Count / (double)pageSize);
+
     protected override void OnInitialized()
+    {
+        LoadEvents();
+    }
+
+    void LoadEvents()
     {
         events = Db.Events
             .Where(x => !x.IsDeleted)
             .OrderByDescending(x => x.StartZeit)
             .ToList();
+
+        if (currentPage > totalPages)
+        {
+            currentPage = totalPages == 0 ? 1 : totalPages;
+        }
+    }
+
+    void GoToPage(int pageNumber)
+    {
+        currentPage = pageNumber;
+    }
+
+    void NextPage()
+    {
+        if (currentPage < totalPages)
+            currentPage++;
+    }
+
+    void PreviousPage()
+    {
+        if (currentPage > 1)
+            currentPage--;
     }
 
     int GetCount(int eventId)
@@ -59,7 +132,8 @@
     {
         var ev = Db.Events.FirstOrDefault(x => x.Id == eventId);
 
-        if (ev == null || ev.EndeZeit >= DateTime.Now) return;
+        if (ev == null || ev.EndeZeit >= DateTime.Now)
+            return;
 
         var registrations = Db.EventChildren
             .Where(x => x.EventId == eventId)
@@ -69,6 +143,7 @@
 
         Db.SaveChanges();
 
+        LoadEvents();
         StateHasChanged();
     }
 }
