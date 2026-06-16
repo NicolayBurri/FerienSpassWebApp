@@ -4,6 +4,8 @@
     {
         Open,
         Reminder,
-        Paid
+        Paid,
+        Refunded,
+        PartlyRefundet
     }
 }

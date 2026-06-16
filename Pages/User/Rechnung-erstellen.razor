@@ -68,7 +68,7 @@ else
         <h4>TWINT</h4>
 
         <a class="btn btn-success"
-           href="https://pay.raisenow.io/fgyzv?lng=en"
+           href="@GetTwintUrl()"
            target="_blank">
             Direkt bezahlen
         </a>
@@ -87,6 +87,8 @@ else
     private string? referenceNumber;
     private string? pdfFileName;
     private string? qrSvg;
+
+    private Invoice? createdInvoice;
 
     private const string IBAN = "CH9206450600189814504";
     private const string CreditorName = "Ferienspass Rohrbach";
@@ -134,6 +136,7 @@ else
             await Db.SaveChangesAsync();
 
             invoiceID = invoice.Id;
+            createdInvoice = invoice;
 
             foreach (var item in items)
             {
@@ -455,5 +458,16 @@ else
         using var data = image.Encode(SKEncodedImageFormat.Png, 100);
 
         return data.ToArray();
+    }
+
+    string GetTwintUrl()
+    {
+        if (createdInvoice == null)
+            return "https://pay.raisenow.io/fgyzv?lng=en";
+
+        var amount = createdInvoice.TotalAmount.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture);
+        var reference = Uri.EscapeDataString(createdInvoice.Reference);
+
+        return $"https://pay.raisenow.io/fgyzv?lng=en&reference.campaign_id={reference}&amount.values={amount}";
     }
 }

@@ -75,6 +75,8 @@ else
                                 <option value="Open">Offen</option>
                                 <option value="Reminder">Mahnung</option>
                                 <option value="Paid">Bezahlt</option>
+                                <option value="Refunded">Zurückerstattet</option>
+                                <option value="PartlyRefundet">Teils Zurückerstattet</option>
 
                             </select>
                         </AuthorizeView>
@@ -217,6 +219,8 @@ else
             InvoiceStatus.Open => "orange",
             InvoiceStatus.Reminder => "red",
             InvoiceStatus.Paid => "green",
+            InvoiceStatus.Refunded => "violet",
+            InvoiceStatus.PartlyRefundet => "purple",
             _ => "black"
         };
     }
@@ -228,6 +232,8 @@ else
             InvoiceStatus.Open => "Offen",
             InvoiceStatus.Reminder => "Mahnung",
             InvoiceStatus.Paid => "Bezahlt",
+            InvoiceStatus.Refunded => "Zurückerstattet",
+            InvoiceStatus.PartlyRefundet => "Teilweise Zurückerstattet",
             _ => "-"
         };
     }
