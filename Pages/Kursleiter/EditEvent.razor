@@ -220,16 +220,46 @@ else
     async Task Save()
     {
         await using var Db = await DbFactory.CreateDbContextAsync();
-        if (ev == null) return;
+
+        if (ev == null)
+            return;
+
+        var dbEvent = await Db.Events
+            .FirstOrDefaultAsync(x => x.Id == ev.Id);
+
+        if (dbEvent == null)
+        {
+            msg = "Event nicht gefunden.";
+            return;
+        }
+
+        dbEvent.Eventname = ev.Eventname;
+        dbEvent.Kategorie = ev.Kategorie;
+        dbEvent.Beschreibung = ev.Beschreibung;
+        dbEvent.Location = ev.Location;
+        dbEvent.Treffpunkt = ev.Treffpunkt;
+        dbEvent.price = ev.price;
+        dbEvent.MinKinder = ev.MinKinder;
+        dbEvent.MaxKinder = ev.MaxKinder;
+        dbEvent.WaitlisteLimit = ev.WaitlisteLimit;
+        dbEvent.AlterMin = ev.AlterMin;
+        dbEvent.AlterMax = ev.AlterMax;
+        dbEvent.BrauchtBetreuung = ev.BrauchtBetreuung;
+        dbEvent.AnzahlBetreuung = ev.AnzahlBetreuung;
+        dbEvent.BrauchtFahrer = ev.BrauchtFahrer;
+        dbEvent.AnzahlSitzplaetze = ev.AnzahlSitzplaetze;
+        dbEvent.BildUrl = ev.BildUrl;
+        dbEvent.DocumentUrl = ev.DocumentUrl;
+        dbEvent.IsArchived = ev.IsArchived;
 
         if (DateTime.TryParse(startText, out var s))
-            ev.StartZeit = s;
+            dbEvent.StartZeit = s;
 
         if (DateTime.TryParse(endText, out var e))
-            ev.EndeZeit = e;
+            dbEvent.EndeZeit = e;
 
         var oldKursleiter = await Db.EventKursleiter
-            .Where(x => x.EventId == ev.Id)
+            .Where(x => x.EventId == dbEvent.Id)
             .ToListAsync();
 
         Db.EventKursleiter.RemoveRange(oldKursleiter);
@@ -240,13 +270,15 @@ else
             {
                 Db.EventKursleiter.Add(new EventKursleiter
                     {
-                        EventId = ev.Id,
+                        EventId = dbEvent.Id,
                         UserId = kl.UserId
                     });
             }
         }
 
         await Db.SaveChangesAsync();
+
+        ev = dbEvent;
 
         msg = "Gespeichert!";
     }
@@ -312,16 +344,27 @@ else
     async Task DeleteEvent(Event ev)
     {
         await using var Db = await DbFactory.CreateDbContextAsync();
-        ev.IsDeleted = true;
+
+        var dbEvent = await Db.Events
+            .FirstOrDefaultAsync(x => x.Id == ev.Id);
+
+        if (dbEvent == null)
+        {
+            msg = "Event nicht gefunden.";
+            return;
+        }
+
+        dbEvent.IsDeleted = true;
 
         var kursleiter = await Db.EventKursleiter
-            .Where(x => x.EventId == ev.Id)
+            .Where(x => x.EventId == dbEvent.Id)
             .ToListAsync();
 
         Db.EventKursleiter.RemoveRange(kursleiter);
 
         await Db.SaveChangesAsync();
-        Nav.NavigateTo($"/kursleiter/events");
+
+        Nav.NavigateTo("/kursleiter/events");
     }
 
     void AddKursleiter()
