@@ -3,8 +3,11 @@
 @using Microsoft.EntityFrameworkCore
 @using FerienspassWebApp.Models
 @using FerienspassWebApp.Data
+@using Microsoft.AspNetCore.Authorization
 
-@inject ApplicationDbContext Db
+@attribute [Authorize(Roles = "Admin,Kursleiter")]
+@inject NavigationManager Nav
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
 
 <h3>Rechnungsverwaltung</h3>
 
@@ -143,6 +146,7 @@ else
 
     void LoadInvoices()
     {
+        using var Db = DbFactory.CreateDbContext();
         invoices = Db.Invoices
             .Include(x => x.ParentUser)
             .OrderByDescending(x => x.CreatedAt)
@@ -173,6 +177,7 @@ else
 
     async Task MarkAsPaid()
     {
+        using var Db = DbFactory.CreateDbContext();
         if (string.IsNullOrWhiteSpace(searchReference))
             return;
 
@@ -192,6 +197,7 @@ else
 
     async Task ChangeStatus(Invoice invoice, string? value)
     {
+        using var Db = DbFactory.CreateDbContext();
         if (value == null)
             return;
 

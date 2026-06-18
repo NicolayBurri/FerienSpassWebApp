@@ -9,9 +9,11 @@
 @using FerienspassWebApp.Models
 @using FerienspassWebApp.Data
 
+@attribute [Authorize(Roles = "Admin,Kursleiter,Eltern")]
+
 @inject UserManager<ApplicationUser> UserManager
 @inject AuthenticationStateProvider AuthStateProvider
-@inject ApplicationDbContext Db
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
 
 <h3>Schülerdaten</h3>
 
@@ -194,6 +196,7 @@ else
 
     async Task LoadChildren()
     {
+        await using var Db = await DbFactory.CreateDbContextAsync();
         myChildren = await Db.Children
             .Where(c => c.ParentUserId == userId)
             .OrderBy(c => c.Name)
@@ -234,6 +237,7 @@ else
 
     async Task AddChild()
     {
+        await using var Db = await DbFactory.CreateDbContextAsync();
         if (isSaving)
             return;
 
@@ -262,6 +266,7 @@ else
 
     async Task DeleteChild(int childId)
     {
+        await using var Db = await DbFactory.CreateDbContextAsync();
         if (isSaving)
             return;
 
@@ -308,6 +313,7 @@ else
 
     async Task SaveChild()
     {
+        await using var Db = await DbFactory.CreateDbContextAsync();
         if (editChild == null)
             return;
 

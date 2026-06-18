@@ -3,8 +3,11 @@
 @using Microsoft.EntityFrameworkCore
 @using FerienspassWebApp.Models
 @using FerienspassWebApp.Data
+@using Microsoft.AspNetCore.Components.Authorization
 
-@inject ApplicationDbContext Db
+@attribute [Authorize(Roles = "Admin,Kursleiter,Eltern")]
+
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
 @inject AuthenticationStateProvider AuthStateProvider
 
 <h3>Meine Rechnungen</h3>
@@ -102,6 +105,7 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        await using var Db = await DbFactory.CreateDbContextAsync();
         var auth = await AuthStateProvider.GetAuthenticationStateAsync();
 
         var userId = auth.User

@@ -3,8 +3,11 @@
 @using Microsoft.EntityFrameworkCore
 @using FerienspassWebApp.Data
 @using FerienspassWebApp.Models
+@using Microsoft.AspNetCore.Authorization
 
-@inject ApplicationDbContext Db
+@attribute [Authorize(Roles = "Admin")]
+@inject NavigationManager Nav
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
 
 <h3>Kinder ohne erstellte Rechnung</h3>
 
@@ -57,6 +60,7 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        await using var Db = await DbFactory.CreateDbContextAsync();
         items = await Db.EventChildren
             .Include(x => x.Child)
             .Include(x => x.Event)
@@ -83,6 +87,7 @@ else
 
     private async Task RemoveChildFromCourse(EventChild item)
     {
+        await using var Db = await DbFactory.CreateDbContextAsync();
         Db.EventChildren.Remove(item);
         await Db.SaveChangesAsync();
 

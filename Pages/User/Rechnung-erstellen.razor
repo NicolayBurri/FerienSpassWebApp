@@ -9,8 +9,12 @@
 @using SkiaSharp
 @using Svg.Skia
 @using System.IO
+@using Microsoft.AspNetCore.Components.Authorization
 
-@inject ApplicationDbContext Db
+@attribute [Authorize(Roles = "Admin,Kursleiter,Eltern")]
+
+
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
 @inject AuthenticationStateProvider AuthStateProvider
 @inject IWebHostEnvironment Env
 
@@ -97,6 +101,7 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        await using var Db = await DbFactory.CreateDbContextAsync();
         var auth = await AuthStateProvider.GetAuthenticationStateAsync();
         userId = auth.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
 
@@ -116,6 +121,7 @@ else
 
     async Task CreateInvoice()
     {
+        await using var Db = await DbFactory.CreateDbContextAsync();
         using var transaction = await Db.Database.BeginTransactionAsync();
 
         try
@@ -167,6 +173,7 @@ else
 
     async Task GeneratePdf(Invoice invoice)
     {
+        await using var Db = await DbFactory.CreateDbContextAsync();
         const int margin = 15;
 
         var user = await Db.Users

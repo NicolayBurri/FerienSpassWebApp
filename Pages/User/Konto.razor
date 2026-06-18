@@ -6,9 +6,11 @@
 @using Microsoft.EntityFrameworkCore
 @using Microsoft.AspNetCore.Components.Authorization
 
+@attribute [Authorize(Roles = "Admin,Kursleiter,Eltern")]
+
 @inject UserManager<ApplicationUser> UserManager
 @inject AuthenticationStateProvider AuthStateProvider
-@inject ApplicationDbContext Db
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
 @inject NavigationManager Navigation
 
 <h2>Konto</h2>
@@ -85,6 +87,7 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        await using var Db = await DbFactory.CreateDbContextAsync();
         var authState = await AuthStateProvider.GetAuthenticationStateAsync();
         userId = UserManager.GetUserId(authState.User);
 
@@ -116,6 +119,7 @@ else
 
     async Task AddContact()
     {
+        await using var Db = await DbFactory.CreateDbContextAsync();
         if (string.IsNullOrEmpty(userId))
             return;
 
@@ -133,6 +137,7 @@ else
 
     async Task DeleteContact(EmergencyContact contact)
     {
+        await using var Db = await DbFactory.CreateDbContextAsync();
         Db.EmergencyContacts.Remove(contact);
         await Db.SaveChangesAsync();
 

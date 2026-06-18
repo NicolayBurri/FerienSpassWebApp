@@ -2,9 +2,13 @@
 
 @using FerienspassWebApp.Data
 @using FerienspassWebApp.Models
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.Authorization
 
-@inject ApplicationDbContext Db
+@attribute [Authorize(Roles = "Admin,Kursleiter")]
 @inject NavigationManager Nav
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
 
 <h3>Event Verwaltung</h3>
 
@@ -85,6 +89,7 @@
 
     void LoadEvents()
     {
+        using var Db = DbFactory.CreateDbContext();
         events = Db.Events
             .Where(x => !x.IsDeleted)
             .OrderByDescending(x => x.StartZeit)
@@ -115,6 +120,7 @@
 
     int GetCount(int eventId)
     {
+        using var Db = DbFactory.CreateDbContext();
         return Db.EventChildren.Count(x => x.EventId == eventId);
     }
 
@@ -130,6 +136,7 @@
 
     void ResetEvent(int eventId)
     {
+        using var Db = DbFactory.CreateDbContext();
         var ev = Db.Events.FirstOrDefault(x => x.Id == eventId);
 
         if (ev == null || ev.EndeZeit >= DateTime.Now)

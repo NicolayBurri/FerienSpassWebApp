@@ -1,9 +1,9 @@
 ﻿@page "/user/Kalender"
 
-@inject ApplicationDbContext Db
 @inject NavigationManager Nav
 @inject AuthenticationStateProvider AuthStateProvider
 @inject IJSRuntime JS
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
 
 @using FerienspassWebApp.Data
 @using FerienspassWebApp.Models
@@ -12,6 +12,9 @@
 @using System.IO
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Authorization
+
+@attribute [Authorize(Roles = "Admin,Kursleiter,Eltern")]
 
 <PageTitle>Event Kalender</PageTitle>
 
@@ -313,6 +316,7 @@ else
     {
         try
         {
+            await using var Db = await DbFactory.CreateDbContextAsync();
             var authState = await AuthStateProvider.GetAuthenticationStateAsync();
             var user = authState.User;
 
@@ -341,6 +345,7 @@ else
 
     private async Task LoadEvents()
     {
+        await using var Db = await DbFactory.CreateDbContextAsync();
         var query = Db.Events
             .AsNoTracking()
             .Include(x => x.Kursleiter)
@@ -418,6 +423,7 @@ else
 
     private async Task LoadMyRegistrations()
     {
+        await using var Db = await DbFactory.CreateDbContextAsync();
         var allRegs = await Db.EventChildren
             .AsNoTracking()
             .Include(x => x.Child)
@@ -445,6 +451,7 @@ else
 
     async Task UnregisterChild(int eventId, int childId)
     {
+        await using var Db = await DbFactory.CreateDbContextAsync();
         var entry = await Db.EventChildren
             .FirstOrDefaultAsync(x =>
                 x.EventId == eventId &&
@@ -462,6 +469,7 @@ else
 
     async Task PromoteWaitingList(int eventId)
     {
+        await using var Db = await DbFactory.CreateDbContextAsync();
         var ev = await Db.Events
             .FirstAsync(x => x.Id == eventId);
 
@@ -511,6 +519,7 @@ else
 
     async Task ExportEventsExcel()
     {
+        await using var Db = await DbFactory.CreateDbContextAsync();
         var currentYear = DateTime.Now.Year;
 
         var allEvents = await Db.Events
@@ -583,6 +592,7 @@ else
 
     async Task UnregisterRole(int roleId)
     {
+        await using var Db = await DbFactory.CreateDbContextAsync();
         var entry = await Db.EventRoleAssignments
             .FirstOrDefaultAsync(x => x.Id == roleId);
 

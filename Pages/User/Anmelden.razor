@@ -3,10 +3,13 @@
 @using Microsoft.EntityFrameworkCore
 @using FerienspassWebApp.Data
 @using FerienspassWebApp.Models
+@using Microsoft.AspNetCore.Authorization
 
-@inject ApplicationDbContext Db
+@attribute [Authorize(Roles = "Admin,Kursleiter,Eltern")]
+
 @inject AuthenticationStateProvider AuthStateProvider
 @inject NavigationManager Navigation
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
 
 <h3>Event Anmeldung</h3>
 
@@ -262,6 +265,7 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        await using var Db = await DbFactory.CreateDbContextAsync();
         try
         {
             var auth = await AuthStateProvider.GetAuthenticationStateAsync();
@@ -327,6 +331,7 @@ else
 
     async Task Register()
     {
+        await using var Db = await DbFactory.CreateDbContextAsync();
         if (isSubmitting)
             return;
 

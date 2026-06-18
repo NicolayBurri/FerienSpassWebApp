@@ -1,4 +1,4 @@
-﻿@page "/kursleiter/event erstellen"
+﻿@page "/kursleiter/event-erstellen"
 
 @using FerienspassWebApp.Models
 @using FerienspassWebApp.Data
@@ -7,7 +7,7 @@
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Identity
 
-@inject ApplicationDbContext Db
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
 @inject UserManager<ApplicationUser> UserManager
 
 @attribute [Authorize(Roles = "Admin,Kursleiter")]
@@ -148,10 +148,17 @@
 
     protected override async Task OnInitializedAsync()
     {
-        var admins = await UserManager.GetUsersInRoleAsync("Admin");
-        var kursleiter = await UserManager.GetUsersInRoleAsync("Kursleiter");
+        await using var Db = await DbFactory.CreateDbContextAsync();
 
-        users = admins.Concat(kursleiter).Distinct().ToList();
+        users = await (
+            from user in Db.Users
+            join userRole in Db.UserRoles on user.Id equals userRole.UserId
+            join role in Db.Roles on userRole.RoleId equals role.Id
+            where role.Name == "Admin" || role.Name == "Kursleiter"
+            select user
+        )
+        .Distinct()
+        .ToListAsync();
     }
 
     private async Task HandleFileUpload(InputFileChangeEventArgs e)
@@ -239,6 +246,7 @@
 
     private async Task<List<string>> CheckKursleiterConflicts()
     {
+        await using var Db = await DbFactory.CreateDbContextAsync();
         var conflictingUsers = new List<string>();
 
         foreach (var userId in selectedUserIds)
@@ -287,6 +295,7 @@
 
     async Task Save()
     {
+        await using var Db = await DbFactory.CreateDbContextAsync();
         var conflicts = await CheckKursleiterConflicts();
 
         if (conflicts.Any())

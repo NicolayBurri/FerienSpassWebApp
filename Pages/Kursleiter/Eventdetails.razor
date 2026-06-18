@@ -7,9 +7,12 @@
 @using ClosedXML.Excel;
 @using System.IO;
 @using Microsoft.AspNetCore.Components;
+@using Microsoft.AspNetCore.Authorization
+
+@attribute [Authorize(Roles = "Admin,Kursleiter")]
 
 @inject IJSRuntime JS
-@inject ApplicationDbContext Db
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
 
 <h1>Event Details</h1>
 
@@ -180,6 +183,7 @@ else
 
     protected override async Task OnParametersSetAsync()
     {
+        await using var Db = await DbFactory.CreateDbContextAsync();
         ev = await Db.Events
             .Include(x=> x.Kursleiter)
             .ThenInclude(x =>x.User)
@@ -216,6 +220,7 @@ else
 
     async Task ExportExcel()
     {
+        await using var Db = await DbFactory.CreateDbContextAsync();
         if (ev == null) return;
 
         using var workbook = new XLWorkbook();
