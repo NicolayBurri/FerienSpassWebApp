@@ -29,6 +29,6 @@ jobs:
           protocol: ftps
           port: 21
           local-dir: publish/
-          server-dir: /test/
+          server-dir: /live/
           security: loose
           state-name: .ftp-deploy-sync-state-test.json
