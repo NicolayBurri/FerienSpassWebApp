@@ -114,23 +114,25 @@ else
 
                     <h3>Event: @ev.Eventname</h3><br />
 
+                    <div style="white-space: pre-line;">
+                        @ev.Beschreibung
+                    </div>
+
                     <p>
-                        Zeit:
+                        <strong>Zeit:</strong>
                         @ev.StartZeit?.ToString("HH:mm") - @ev.EndeZeit?.ToString("HH:mm")
                     </p>
 
-                    <p>Kategorie: @ev.Kategorie</p>
+                    <p><strong>Kategorie:</strong> @ev.Kategorie</p>
 
-                    <p>Beschreibung: @ev.Beschreibung</p>
+                    <p><strong>Treffpunkt</strong> @ev.Treffpunkt</p>
 
-                    <p>Treffpunkt: @ev.Treffpunkt</p>
+                    <p><strong>Veranstaltungsort:</strong> @ev.Location</p>
 
-                    <p>Eventlocation: @ev.Location</p>
-
-                    <p>Preis: @ev.price CHF</p>
+                    <p><strong>Preis:</strong> @ev.price CHF</p>
 
                     <p>
-                        Mindest- und Maximalkapazität:
+                        <strong>Mindest- und Maximalkapazität:</strong>
                         @ev.MinKinder - @ev.MaxKinder Kinder
                     </p>
 
@@ -157,8 +159,8 @@ else
                     }
 
                     <p>
-                        Altersbeschränkung:
-                        @ev.AlterMin - @ev.AlterMax Jahre alt
+                        <strong>Klassenbeschränkung: </strong>
+                        @ev.KlasseMin - @ev.KlasseMax
                     </p>
 
                     <h4>Kursleiter</h4>

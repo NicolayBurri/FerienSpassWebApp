@@ -34,6 +34,9 @@ namespace FerienspassWebApp.Models
         public bool BrauchtFahrer {  get; set; }
         public int? AnzahlSitzplaetze { get; set; }
 
+        public KlasseStufe? KlasseMin {  get; set; }
+        public KlasseStufe? KlasseMax { get; set; }
+
         public int? AlterMin {  get; set; }
         public int? AlterMax { get; set; }
 

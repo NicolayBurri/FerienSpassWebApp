@@ -90,15 +90,23 @@ else
                @bind="ev.WaitlisteLimit"
                placeholder="Warteliste Limit" />
 
-        <p style="margin:0px;">Mindestalter:</p>
-        <input type="number"
-               @bind="ev.AlterMin"
-               placeholder="Mindestalter" />
+        <p style="margin:0px;">Mindestklasse:</p>
+        <select @bind="ev.KlasseMin">
+            <option value="">Keine Einschränkung</option>
+            @foreach (var k in Enum.GetValues<KlasseStufe>())
+            {
+                <option value="@k">@k</option>
+            }
+        </select>
 
-        <p style="margin:0px;">Maximalalter:</p>
-        <input type="number"
-               @bind="ev.AlterMax"
-               placeholder="Maximalalter" />
+        <p style="margin:0px;">Maximalklasse:</p>
+        <select @bind="ev.KlasseMax">
+            <option value="">Keine Einschränkung</option>
+            @foreach (var k in Enum.GetValues<KlasseStufe>())
+            {
+                <option value="@k">@k</option>
+            }
+        </select>
 
         <label>
             <input type="checkbox"
@@ -148,7 +156,7 @@ else
             <a href="/@ev.DocumentUrl" target="_blank">Dokument öffnen</a>
         }
 
-        <div style"border:2px dashed #ccc; padding:20px; text-align:center;">
+        <div style="border:2px dashed #ccc; padding:20px; text-align:center;">
             <p>Neues Dokument hochladen</p>
             <InputFile OnChange="HandleDocUpload"
                   accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
@@ -233,6 +241,12 @@ else
             return;
         }
 
+        if (ev.KlasseMin.HasValue && ev.KlasseMax.HasValue && ev.KlasseMin > ev.KlasseMax)
+        {
+            msg = "Mindestklasse darf nicht höher sein als Maximalklasse.";
+            return;
+        }
+
         dbEvent.Eventname = ev.Eventname;
         dbEvent.Kategorie = ev.Kategorie;
         dbEvent.Beschreibung = ev.Beschreibung;
@@ -242,8 +256,8 @@ else
         dbEvent.MinKinder = ev.MinKinder;
         dbEvent.MaxKinder = ev.MaxKinder;
         dbEvent.WaitlisteLimit = ev.WaitlisteLimit;
-        dbEvent.AlterMin = ev.AlterMin;
-        dbEvent.AlterMax = ev.AlterMax;
+        dbEvent.KlasseMin = ev.KlasseMin;
+        dbEvent.KlasseMax = ev.KlasseMax;
         dbEvent.BrauchtBetreuung = ev.BrauchtBetreuung;
         dbEvent.AnzahlBetreuung = ev.AnzahlBetreuung;
         dbEvent.BrauchtFahrer = ev.BrauchtFahrer;
@@ -317,9 +331,9 @@ else
 
                 AnzahlSitzplaetze = ev.AnzahlSitzplaetze,
 
-                AlterMin = ev.AlterMin,
+                KlasseMin = ev.KlasseMin,
 
-                AlterMax = ev.AlterMax,
+                KlasseMax = ev.KlasseMax,
 
                 BildUrl = ev.BildUrl,
 

@@ -87,8 +87,23 @@
 
     <hr />
 
-    <input type="number" placeholder="Min Alter" @bind="ev.AlterMin" />
-    <input type="number" placeholder="Max Alter" @bind="ev.AlterMax" />
+    <label>Mindestklasse</label>
+    <select @bind="ev.KlasseMin">
+        <option value="">Keine Einschränkung</option>
+        @foreach (var k in Enum.GetValues<KlasseStufe>())
+            {
+            <option value="@k">@k</option>
+        }
+    </select>
+
+    <label>Maximalklasse</label>
+    <select @bind="ev.KlasseMax">
+        <option value="">Keine Einschränkung</option>
+        @foreach (var k in Enum.GetValues<KlasseStufe>())
+        {
+            <option value="@k">@k</option>
+        }
+    </select>
 
     <hr />
 
@@ -242,7 +257,7 @@
         msg = "Dokument hochgeladen!";
     }
 
-    
+
 
     private async Task<List<string>> CheckKursleiterConflicts()
     {
@@ -297,6 +312,12 @@
     {
         await using var Db = await DbFactory.CreateDbContextAsync();
         var conflicts = await CheckKursleiterConflicts();
+
+        if (ev.KlasseMin.HasValue && ev.KlasseMax.HasValue && ev.KlasseMin > ev.KlasseMax)
+            {
+                msg = "Mindestklasse darf nicht höher sein als Maximalklasse?";
+                return;
+            }
 
         if (conflicts.Any())
         {

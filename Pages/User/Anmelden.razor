@@ -63,8 +63,8 @@ else
             </p>
 
             <p>
-                <b>Alter:</b>
-                @ev.AlterMin - @ev.AlterMax Jahre
+                <b>Klasse:</b>
+                @ev.KlasseMin - @ev.KlasseMax
             </p>
 
             <p>
@@ -429,23 +429,23 @@ else
                     continue;
                 }
 
-                if (ev.AlterMin.HasValue && child.Alter < ev.AlterMin.Value)
+                if (ev.KlasseMin.HasValue && child.Klasse < ev.KlasseMin.Value)
                 {
                     results.Add(new RegistrationResult
                         {
                             ChildName = child.Name,
-                            Status = $"zu jung ({child.Alter})",
+                            Status = $"Klassenstufe zu tief: ({child.Klasse})",
                             Color = "red"
                         });
                     continue;
                 }
 
-                if (ev.AlterMax.HasValue && child.Alter > ev.AlterMax.Value)
+                if (ev.KlasseMax.HasValue && child.Klasse > ev.KlasseMax.Value)
                 {
                     results.Add(new RegistrationResult
                         {
                             ChildName = child.Name,
-                            Status = $"zu alt ({child.Alter})",
+                            Status = $"Klassenstufe zu hoch: ({child.Klasse})",
                             Color = "red"
                         });
                     continue;
