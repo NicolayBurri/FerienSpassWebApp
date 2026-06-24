@@ -198,20 +198,23 @@ else
     async Task ChangeStatus(Invoice invoice, string? value)
     {
         using var Db = DbFactory.CreateDbContext();
-        if (value == null)
+
+        if (string.IsNullOrWhiteSpace(value))
             return;
 
-        invoice.Status = Enum.Parse<InvoiceStatus>(value);
+        var dbInvoice = await Db.Invoices
+            .FirstOrDefaultAsync(x => x.Id == invoice.Id);
 
-        if (invoice.Status == InvoiceStatus.Paid)
-        {
-            invoice.PaidAt = DateTime.Now;
-        }
+        if (dbInvoice == null)
+            return;
 
-        if (invoice.Status == InvoiceStatus.Reminder)
-        {
-            invoice.ReminderSentAt = DateTime.Now;
-        }
+        dbInvoice.Status = Enum.Parse<InvoiceStatus>(value);
+
+        if (dbInvoice.Status == InvoiceStatus.Paid)
+            dbInvoice.PaidAt = DateTime.Now;
+
+        if (dbInvoice.Status == InvoiceStatus.Reminder)
+            dbInvoice.ReminderSentAt = DateTime.Now;
 
         await Db.SaveChangesAsync();
 

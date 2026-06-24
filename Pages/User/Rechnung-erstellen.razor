@@ -126,6 +126,21 @@ else
 
         try
         {
+            var openItems = await Db.EventChildren
+                .Include(x => x.Event)
+                .Include(x => x.Child)
+                .Where(x =>
+                    x.Child.ParentUserId == userId &&
+                    !x.IsInvoiced &&
+                    x.Status == EnrollmentStatus.Confirmed)
+                .ToListAsync();
+
+            if (!openItems.Any())
+                return;
+
+            total = openItems.Sum(x => (decimal)(x.Event.price ?? 0));
+
+
             referenceNumber = GenerateISO11649(userId!);
 
             var invoice = new Invoice
@@ -144,7 +159,7 @@ else
             invoiceID = invoice.Id;
             createdInvoice = invoice;
 
-            foreach (var item in items)
+            foreach (var item in openItems)
             {
                 item.IsInvoiced = true;
 
@@ -161,13 +176,17 @@ else
 
             await transaction.CommitAsync();
 
+            items = openItems;
+
             await GeneratePdf(invoice);
 
             StateHasChanged();
         }
-        catch
+        catch (Exception ex)
         {
             await transaction.RollbackAsync();
+            Console.WriteLine(ex.ToString());
+            throw;
         }
     }
 
