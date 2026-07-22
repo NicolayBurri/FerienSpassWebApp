@@ -16,25 +16,27 @@
 }
 else
 {
-    <div style="margin-bottom:20px; display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+    <div class="day-navigation">
 
-        <button class="btn btn-secondary"
+        <button class="btn btn-secondary navigation-button"
                 disabled="@(currentDayIndex == 0)"
                 @onclick="PreviousDay">
             ← Vorheriger Tag
         </button>
 
-        @for (int i = 0; i < days.Count; i++)
-        {
-            var index = i;
+        <div class="day-buttons">
+            @for (int i = 0; i < days.Count; i++)
+            {
+                var index = i;
 
-            <button class="btn @(currentDayIndex == index ? "btn-primary" : "btn-outline-primary")"
-                    @onclick="() => GoToDay(index)">
-                @days[index].ToString("dd.MM")
-            </button>
-        }
+                <button class="btn @(currentDayIndex == index ? "btn-primary" : "btn-outline-primary") day-button"
+                        @onclick="() => GoToDay(index)">
+                    @days[index].ToString("dd.MM")
+                </button>
+            }
+        </div>
 
-        <button class="btn btn-secondary"
+        <button class="btn btn-secondary navigation-button"
                 disabled="@(currentDayIndex == days.Count - 1)"
                 @onclick="NextDay">
             Nächster Tag →
@@ -42,53 +44,71 @@ else
 
     </div>
 
-    <h2>@selectedDay?.ToString("dddd dd.MM.yyyy")</h2>
+    <h2 class="selected-day">
+        @selectedDay?.ToString("dddd dd.MM.yyyy")
+    </h2>
 
     @foreach (var ev in eventsToday)
     {
-        <div style="border:1px solid #ccc; padding:8px; margin-bottom:5px; display:flex; align-items:flex-start;">
+        <article class="event-card">
 
-            <div style="flex:auto;">
+            <div class="event-content">
 
-                <h3>Event: @ev.Eventname</h3><br />
+                <h3 class="event-title">Event: @ev.Eventname</h3>
 
-                <div style="white-space: pre-line;">
+                <div class="event-description">
                     @ev.Beschreibung
                 </div>
 
                 <h4>Eventdetails</h4>
 
-                <p>
-                    <strong>Zeit:</strong>
-                    @ev.StartZeit?.ToString("HH:mm") - @ev.EndeZeit?.ToString("HH:mm")
-                </p>
+                <div class="event-details">
+                    <p>
+                        <strong>Zeit:</strong>
+                        @ev.StartZeit?.ToString("HH:mm") - @ev.EndeZeit?.ToString("HH:mm")
+                    </p>
 
-                <p><strong>Kategorie:</strong> @ev.Kategorie</p>
+                    <p>
+                        <strong>Kategorie:</strong>
+                        @ev.Kategorie
+                    </p>
 
-                <p><strong>Treffpunkt:</strong> @ev.Treffpunkt</p>
+                    <p>
+                        <strong>Treffpunkt:</strong>
+                        @ev.Treffpunkt
+                    </p>
 
-                <p><strong>Eventlocation:</strong> @ev.Location</p>
+                    <p>
+                        <strong>Eventlocation:</strong>
+                        @ev.Location
+                    </p>
 
-                <p><strong>Preis:</strong> @ev.price CHF</p>
+                    <p>
+                        <strong>Preis:</strong>
+                        @ev.price CHF
+                    </p>
 
-                <p>
-                    <strong>Mindest- und Maximalkapazität:</strong>
-                    @ev.MinKinder - @ev.MaxKinder Kinder
-                </p>
+                    <p>
+                        <strong>Mindest- und Maximalkapazität:</strong>
+                        @ev.MinKinder - @ev.MaxKinder Kinder
+                    </p>
 
-                <p>
-                    <strong>Klassenbeschränkung:</strong>
-                    @ev.KlasseMin - @ev.KlasseMax
-                </p>
+                    <p>
+                        <strong>Klassenbeschränkung:</strong>
+                        @ev.KlasseMin - @ev.KlasseMax
+                    </p>
+                </div>
 
                 <h4>Kursleiter</h4>
 
                 @if (ev.Kursleiter?.Any() == true)
                 {
-                    @foreach (var kl in ev.Kursleiter)
-                    {
-                        <p>@kl.User?.Vorname @kl.User?.Nachname</p>
-                    }
+                    <div class="course-leaders">
+                        @foreach (var kl in ev.Kursleiter)
+                        {
+                            <p>@kl.User?.Vorname @kl.User?.Nachname</p>
+                        }
+                    </div>
                 }
                 else
                 {
@@ -98,15 +118,158 @@ else
 
             @if (!string.IsNullOrEmpty(ev.BildUrl))
             {
-                <img src="@ev.BildUrl"
-                     style="width:auto;
-                            max-height:500px;
-                            object-fit:cover;
-                            border-radius:10px;" />
+                <div class="event-image-container">
+                    <img src="@ev.BildUrl"
+                         class="event-image"
+                         alt="Bild zum Event @ev.Eventname" />
+                </div>
             }
-        </div>
+        </article>
     }
 }
+
+<style>
+    .day-navigation {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 20px;
+        width: 100%;
+    }
+
+    .day-buttons {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .navigation-button,
+    .day-button {
+        white-space: nowrap;
+    }
+
+    .selected-day {
+        margin-bottom: 16px;
+        overflow-wrap: anywhere;
+    }
+
+    .event-card {
+        display: flex;
+        align-items: flex-start;
+        gap: 20px;
+        width: 100%;
+        margin-bottom: 14px;
+        padding: 14px;
+        border: 1px solid #ccc;
+        border-radius: 10px;
+        box-sizing: border-box;
+        overflow: hidden;
+    }
+
+    .event-content {
+        flex: 1 1 0;
+        min-width: 0;
+        overflow-wrap: anywhere;
+    }
+
+    .event-title {
+        margin-top: 0;
+        margin-bottom: 14px;
+    }
+
+    .event-description {
+        margin-bottom: 20px;
+        white-space: pre-line;
+        overflow-wrap: anywhere;
+    }
+
+    .event-details p {
+        margin-bottom: 10px;
+    }
+
+    .course-leaders p {
+        margin-bottom: 6px;
+    }
+
+    .event-image-container {
+        flex: 0 1 42%;
+        width: 42%;
+        max-width: 500px;
+    }
+
+    .event-image {
+        display: block;
+        width: 100%;
+        height: auto;
+        max-height: 500px;
+        object-fit: cover;
+        border-radius: 10px;
+    }
+
+    @@media (max-width: 768px) {
+        .day-navigation {
+            align-items: stretch;
+        }
+
+        .navigation-button {
+            flex: 1 1 calc(50% - 4px);
+        }
+
+        .day-buttons {
+            order: 3;
+            width: 100%;
+        }
+
+        .day-button {
+            flex: 1 1 auto;
+        }
+
+        .selected-day {
+            font-size: 1.4rem;
+        }
+
+        .event-card {
+            flex-direction: column;
+            gap: 14px;
+            padding: 12px;
+        }
+
+        .event-image-container {
+            order: -1;
+            width: 100%;
+            max-width: none;
+        }
+
+        .event-image {
+            width: 100%;
+            max-height: 320px;
+        }
+    }
+
+    @@media (max-width: 480px) {
+        .navigation-button {
+            flex: 1 1 100%;
+            width: 100%;
+        }
+
+        .day-button {
+            flex: 1 1 calc(33.333% - 8px);
+        }
+
+        .event-card {
+            padding: 10px;
+        }
+
+        .event-title {
+            font-size: 1.25rem;
+        }
+
+        .event-details p {
+            margin-bottom: 12px;
+        }
+    }
+</style>
 
 @code {
     private List<Event> events = new();

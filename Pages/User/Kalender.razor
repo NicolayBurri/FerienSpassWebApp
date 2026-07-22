@@ -47,7 +47,7 @@ else
     <div class="filter-bar">
         <h4>Filter: </h4>
         <select value="@selectedKategorie"
-            @onchange="OnKategorieChanged">
+                @onchange="OnKategorieChanged">
             <option value="">Alle Kategorien</option>
             <option value="@EventKategorie.Tier">Tiere</option>
             <option value="@EventKategorie.Food">Essen</option>
@@ -58,7 +58,7 @@ else
             <option value="@EventKategorie.Allgemein">Allgemein</option>
         </select>
 
-        <input type="number" value="@filterAlter" @oninput="OnAlterChanged" placeholder="Alter"/>
+        <input type="number" value="@filterAlter" @oninput="OnAlterChanged" placeholder="Alter" />
 
         <button class="btn btn-sm btn-dark" @onclick="ToggleDateFilter">Datum</button>
 
@@ -78,7 +78,7 @@ else
     }
     else
     {
-        <div style="margin-bottom:20px; display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+        <div class="day-navigation">
 
             <button class="btn btn-secondary"
                     disabled="@(currentDayIndex == 0)"
@@ -104,17 +104,17 @@ else
 
         </div>
 
-        <h2>@selectedDay?.ToString("dddd dd.MM.yyyy")</h2>
+        <h2 class="selected-day">@selectedDay?.ToString("dddd dd.MM.yyyy")</h2>
 
         @foreach (var ev in eventsToday)
         {
-            <div style="border:1px solid #ccc; padding:8px; margin-bottom:5px; display:flex; align-items:flex-start;">
+            <div class="event-card">
 
-                <div style="flex:auto;">
+                <div class="event-content">
 
                     <h3>Event: @ev.Eventname</h3><br />
 
-                    <div style="white-space: pre-line;">
+                    <div class="event-description">
                         @ev.Beschreibung
                     </div>
 
@@ -140,19 +140,19 @@ else
                     {
                         @if (av.FreiePlaetze > 0)
                         {
-                            <p style="color:green">
+                            <p class="availability available">
                                 Noch @av.FreiePlaetze Plätze verfügbar
                             </p>
                         }
                         else if (av.FreieWartelistePlaetze > 0)
                         {
-                            <p style="color:orange">
+                            <p class="availability waiting-list">
                                 Event voll – noch @av.FreieWartelistePlaetze Wartelisteplätze verfügbar
                             </p>
                         }
                         else
                         {
-                            <p style="color:red">
+                            <p class="availability fully-booked">
                                 AUSGEBUCHT
                             </p>
                         }
@@ -185,14 +185,14 @@ else
 
                     @if (myRegsByEvent.TryGetValue(ev.Id, out var myRegs) && myRegs.Any())
                     {
-                        <div style="margin-top:8px;">
+                        <div class="registration-section">
                             <b>Meine Kinder:</b>
 
-                            <ul>
+                            <ul class="registration-list">
                                 @foreach (var r in myRegs)
                                 {
                                     <li>
-                                        <div style="display:flex; gap:20px;">
+                                        <div class="registration-row">
                                             <p>Kind:</p>
 
                                             @r.Child.Name
@@ -203,15 +203,14 @@ else
 
                                             @if (r.Status == EnrollmentStatus.Confirmed)
                                             {
-                                                <span style="color:green">Bestätigt</span>
+                                                <span class="status-confirmed">Bestätigt</span>
                                             }
                                             else
                                             {
-                                                <span style="color:orange">Warteliste</span>
+                                                <span class="status-waiting">Warteliste</span>
                                             }
 
-                                            <button style="max-height:30px; font-size:14px; line-height:5px;"
-                                                    class="btn btn-warning"
+                                            <button class="btn btn-sm btn-warning"
                                                     @onclick="() => UnregisterChild(ev.Id, r.ChildId)">
                                                 Abmelden
                                             </button>
@@ -224,14 +223,14 @@ else
 
                     @if (myRolesByEvent.TryGetValue(ev.Id, out var roles) && roles.Any())
                     {
-                        <div style="margin-top:8px;">
+                        <div class="registration-section">
                             <b>Meine Rollen:</b>
 
-                            <ul>
+                            <ul class="registration-list">
                                 @foreach (var r in roles)
                                 {
                                     <li>
-                                        <div style="display:flex; gap:20px;">
+                                        <div class="registration-row">
                                             @if (r.Role == RoleType.Driver)
                                             {
                                                 <span>Fahrer</span>
@@ -246,8 +245,7 @@ else
                                                 <span>Betreuungsperson</span>
                                             }
 
-                                            <button style="height:30px; font-size:15px; line-height:5px;"
-                                                    class="btn btn-warning"
+                                            <button class="btn btn-sm btn-warning"
                                                     @onclick="() => UnregisterRole(r.Id)">
                                                 Abmelden
                                             </button>
@@ -261,16 +259,208 @@ else
 
                 @if (!string.IsNullOrEmpty(ev.BildUrl))
                 {
-                    <img src="@ev.BildUrl"
-                         style="width:auto;
-                            max-height:500px;
-                            object-fit:cover;
-                            border-radius:10px;" />
+                    <div class="event-image-container">
+                        <img src="@ev.BildUrl"
+                             class="event-image"
+                             alt="Bild zu @ev.Eventname" />
+                    </div>
                 }
             </div>
         }
     }
 }
+
+
+<style>
+    .filter-bar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 10px;
+    }
+
+        .filter-bar h4 {
+            margin: 0;
+        }
+
+        .filter-bar select,
+        .filter-bar input {
+            min-height: 38px;
+            max-width: 100%;
+        }
+
+    .day-navigation {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 20px;
+    }
+
+    .selected-day {
+        overflow-wrap: anywhere;
+    }
+
+    .event-card {
+        display: flex;
+        align-items: flex-start;
+        gap: 20px;
+        width: 100%;
+        padding: 12px;
+        margin-bottom: 12px;
+        border: 1px solid #ccc;
+        border-radius: 8px;
+        box-sizing: border-box;
+    }
+
+    .event-content {
+        flex: 1 1 0;
+        min-width: 0;
+        overflow-wrap: anywhere;
+    }
+
+        .event-content p {
+            margin-bottom: 10px;
+        }
+
+    .event-description {
+        margin-bottom: 16px;
+        white-space: pre-line;
+        overflow-wrap: anywhere;
+    }
+
+    .event-image-container {
+        flex: 0 1 40%;
+        max-width: 500px;
+        min-width: 240px;
+    }
+
+    .event-image {
+        display: block;
+        width: 100%;
+        height: auto;
+        max-height: 500px;
+        object-fit: cover;
+        border-radius: 10px;
+    }
+
+    .registration-section {
+        margin-top: 12px;
+    }
+
+    .registration-list {
+        margin-top: 8px;
+        padding-left: 20px;
+    }
+
+    .registration-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 10px;
+    }
+
+        .registration-row p {
+            margin: 0;
+        }
+
+    .availability {
+        font-weight: 600;
+    }
+
+    .available,
+    .status-confirmed {
+        color: green;
+    }
+
+    .waiting-list,
+    .status-waiting {
+        color: orange;
+    }
+
+    .fully-booked {
+        color: red;
+    }
+
+    @@media (max-width: 768px) {
+        h1 {
+            font-size: 1.7rem;
+        }
+
+        .filter-bar {
+            align-items: stretch;
+        }
+
+            .filter-bar h4 {
+                width: 100%;
+            }
+
+            .filter-bar select,
+            .filter-bar input,
+            .filter-bar button {
+                width: 100%;
+            }
+
+        .day-navigation {
+            align-items: stretch;
+        }
+
+            .day-navigation > .btn {
+                flex: 1 1 calc(50% - 8px);
+            }
+
+        .selected-day {
+            font-size: 1.35rem;
+        }
+
+        .event-card {
+            flex-direction: column;
+            gap: 12px;
+            padding: 10px;
+        }
+
+        .event-image-container {
+            order: -1;
+            width: 100%;
+            max-width: none;
+            min-width: 0;
+        }
+
+        .event-image {
+            width: 100%;
+            max-height: 300px;
+        }
+
+        .registration-list {
+            padding-left: 0;
+            list-style: none;
+        }
+
+        .registration-row {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 6px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+        }
+
+            .registration-row .btn {
+                width: 100%;
+            }
+    }
+
+    @@media (max-width: 420px) {
+        .day-navigation > .btn {
+            flex-basis: 100%;
+        }
+
+        .event-card {
+            padding: 8px;
+        }
+    }
+</style>
 
 @code {
 
@@ -547,7 +737,8 @@ else
 
         int row = 2;
 
-        foreach (var ev in allEvents){
+        foreach (var ev in allEvents)
+        {
             var kursleiterNames = ev.Kursleiter.Any()
                 ? string.Join(", ",
                 ev.Kursleiter
@@ -610,7 +801,7 @@ else
     async Task ToggleDateFilter()
     {
         showDateFilter = !showDateFilter;
-        
+
 
         if (!showDateFilter)
         {
