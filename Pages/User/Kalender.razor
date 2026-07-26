@@ -12,7 +12,8 @@
 @using System.IO
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Components.Authorization
-@using Microsoft.AspNetCore.Authorization
+@using System.Text.RegularExpressions;
+@using System.Net;
 
 @attribute [Authorize(Roles = "Admin,Kursleiter,Eltern")]
 
@@ -115,7 +116,7 @@ else
                     <h3>Event: @ev.Eventname</h3><br />
 
                     <div class="event-description">
-                        @ev.Beschreibung
+                        @((MarkupString)FormatBeschreibung(ev.Beschreibung))
                     </div>
 
                     <p>
@@ -842,5 +843,25 @@ else
         {
             currentDayIndex = index;
         }
+    }
+
+    private string FormatBeschreibung(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return string.Empty;
+
+        // HTML escapen, damit kein HTML eingeschleust werden kann
+        text = WebUtility.HtmlEncode(text);
+
+        // Zeilenumbrüche beibehalten
+        text = text.Replace("\r\n", "<br>").Replace("\n", "<br>");
+
+        // Alles vor einem Doppelpunkt fett darstellen
+        text = Regex.Replace(
+            text,
+            @"(^|<br>)([^:<br]+:)",
+            "$1<strong>$2</strong>");
+
+        return text;
     }
 }

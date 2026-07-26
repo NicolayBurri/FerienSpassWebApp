@@ -7,6 +7,8 @@
 @using FerienspassWebApp.Data
 @using FerienspassWebApp.Models
 @using Microsoft.EntityFrameworkCore
+@using System.Text.RegularExpressions;
+@using System.Net;
 
 <h1>Event Kalender</h1>
 
@@ -57,7 +59,7 @@ else
                 <h3 class="event-title">Event: @ev.Eventname</h3>
 
                 <div class="event-description">
-                    @ev.Beschreibung
+                    @((MarkupString)FormatBeschreibung(ev.Beschreibung))
                 </div>
 
                 <h4>Eventdetails</h4>
@@ -342,5 +344,25 @@ else
         {
             currentDayIndex = index;
         }
+    }
+
+    private string FormatBeschreibung(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return string.Empty;
+
+        // HTML escapen, damit kein HTML eingeschleust werden kann
+        text = WebUtility.HtmlEncode(text);
+
+        // Zeilenumbrüche beibehalten
+        text = text.Replace("\r\n", "<br>").Replace("\n", "<br>");
+
+        // Alles vor einem Doppelpunkt fett darstellen
+        text = Regex.Replace(
+            text,
+            @"(^|<br>)([^:<br]+:)",
+            "$1<strong>$2</strong>");
+
+        return text;
     }
 }
