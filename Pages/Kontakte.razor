@@ -1,54 +1,94 @@
 ﻿@page "/Kontakte"
-@using FerienspassWebApp.Services
-@inject DocxService DocxService
-@inject IWebHostEnvironment Env
+
+@using FerienspassWebApp.Models
+@using Microsoft.AspNetCore.Identity
+
+@inject UserManager<ApplicationUser> UserManager
 
 <PageTitle>Kontakte</PageTitle>
 
 <h1>Kontakte</h1>
 
-
 <div class="survey-container">
-    @if (Documents.Count == 0)
+
+    <p>Fragen oder Probleme? Zögert nicht, uns zu kontaktieren.</p>
+
+    @if (Kontaktpersonen.Count == 0)
     {
-        <p> Die Kontaktliste wird gerade überarbeitet.</p>
+        <p>Die Kontaktliste wird gerade überarbeitet.</p>
     }
     else
     {
-        <p>Fragen oder Probleme? Zögert nicht uns zu Kontaktieren</p>
-
-        @foreach (var doc in Documents)
+        <p>Bei Fragen zu den Kursen kannst du bei folgenden Personen des FerienSpass-Teams nachfragen:</p>
+        @foreach (var person in Kontaktpersonen)
         {
-            <SurveyPrompt Title="@doc.Title" Content="@doc.Html" />
+            <div style="border:1px solid #ccc;
+                        border-radius:8px;
+                        padding:15px;
+                        margin-bottom:12px;
+                        background:#f8f6;">
+
+                <h4>@person.Vorname @person.Nachname</h4>
+
+                @if (!string.IsNullOrWhiteSpace(person.Telefonnummer))
+                {
+                    <p>
+                        <strong>Telefon:</strong>
+                        <a href="tel:@person.Telefonnummer">
+                            @person.Telefonnummer
+                        </a>
+                    </p>
+                }
+
+                @if (!string.IsNullOrWhiteSpace(person.Email))
+                {
+                    <p>
+                        <strong>E-Mail:</strong>
+                        <a href="mailto:@person.Email">
+                            @person.Email
+                        </a>
+                    </p>
+                }
+            </div>
         }
+        <p>
+            Nun wünschen wir dir ganz viel Spass beim Durchlesen und Auswählen.
+            Wir freuen uns schon jetzt auf deine Anmeldung und das Mitmachen!
+        </p>
+
+        <h4>
+            Dein FerienSpass-Team
+        </h4>
     }
 
-    <img src="/Bilder/Ferienspass.png" alt="Fereienspasslogo" class="responsive-img" />
+    <br />
+
+    <h5 style="font-weight:bold;">ÜBRIGENS: Bei jedem Kurs gibt es ein kleines Znüni oder Zvieri!</h5>
+
+    <br />
+
+    <img src="/Bilder/Ferienspass.png"
+         alt="Ferienspasslogo"
+         class="responsive-img" />
+
+    
 
 </div>
 
-
-
-
 @code {
-    private List<DocItem> Documents = new();
+    private List<ApplicationUser> Kontaktpersonen = new();
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
-        var folder = Path.Combine(Env.WebRootPath, "configsheets/Kontakte");
+        var admins = await UserManager.GetUsersInRoleAsync("Admin");
+        var kursleiter = await UserManager.GetUsersInRoleAsync("Kursleiter");
 
-        var files = Directory.GetFiles(folder, "*.docx");
-
-        Documents = files.Select(file => new DocItem
-            {
-                Title = Path.GetFileNameWithoutExtension(file),
-                Html = DocxService.ConvertToHtml(file)
-            }).ToList();
-    }
-
-    private class DocItem
-    {
-        public string Title { get; set; } = "";
-        public string Html { get; set; } = "";
+        Kontaktpersonen = admins
+            .Concat(kursleiter)
+            .GroupBy(x => x.Id)
+            .Select(x => x.First())
+            .OrderBy(x => x.Nachname)
+            .ThenBy(x => x.Vorname)
+            .ToList();
     }
 }
