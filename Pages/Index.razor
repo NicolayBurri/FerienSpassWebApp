@@ -1,6 +1,17 @@
 ﻿@page "/"
+
+@implements IDisposable
+
 @using FerienspassWebApp.Services
 @using System.Text.RegularExpressions
+@using FerienspassWebApp.Models
+@using FerienspassWebApp.Data
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Components.Authorization
+@using System.Timers
+
+@inject ApplicationDbContext Db
+@inject AuthenticationStateProvider AuthenticationStateProvider
 @inject DocxService DocxService
 @inject IWebHostEnvironment Env
 
@@ -14,20 +25,97 @@
 }
 else
 {
-    <p>Danke für Ihr interesse. Bitte entnehmen Sie die wichtigsten Informationen auf dieser Startseite.</p>
+    <h4>Danke für Ihr interesse. Bitte entnehmen Sie die wichtigsten Informationen auf dieser Startseite.</h4>
 
-    @foreach (var doc in Documents)
+    <br />
+
+    <div style="position:relative; background:#f2f2f2; border:1px solid #ccc; border-radius:8px; padding:20px; margin-bottom:20px;">
+        <div style="position:absolute;
+                    top:-12px;
+                    left:-12px;
+                    width:30px;
+                    height:30px;
+                    border-radius:50%;
+                    background:blue;
+                    color:white;
+                    font-weight:bold;
+                    display:flex;
+                    justify-content:center;
+                    align-items:center;
+                    border:2px solid white;">
+                i
+         </div>
+        @if (settings != null)
+        {
+            <h3 style="color:red">20. FERIENSPASS 21.-25. September 2026:</h3>
+             @if (isKursleiter)
+            {
+                <h4> Anmeldungen ab: @settings.KursleiterStart?.ToString("dd.MM.yyyy HH:mm") </h4>
+          
+                <h4> Anmeldeschluss: @settings.KursleiterEnde?.ToString("dd.MM.yyyy HH:mm")! </h4>
+            }
+            else
+            {
+                <h4> Anmeldungen ab: @settings.AnmeldungStart?.ToString("dd.MM.yyyy HH:mm") </h4>
+
+                <h4> Anmeldeschluss: @settings.AnmeldungEnde?.ToString("dd.MM.yyyy HH:mm")  </h4>
+            }
+        
+            <h4 style="color:darkred">Bezahlungen müssen bis am Freitag, dem 11. September 2026 beglichen werden. </h4>
+        }
+    </div>
+
+    <br />
+
+    <h3>
+        Wir danken unseren Sponsoren und HelferInnen ganz herzlich
+        für ihre finanzielle, materielle oder persönliche Unterstützung.
+        Nur dank ihrer Hilfe ist es uns möglich, den Kindern
+        spannende und erschwingliche Kurse anzubieten!
+    </h3>
+    @if (!string.IsNullOrWhiteSpace(AktuellerSponsor))
     {
-        <SurveyPrompt Title="@doc.Title" Content="@doc.Html" />
+        
+        <div style="margin-top:40px;
+            padding:15px;
+            text-align:center;
+            background:#f2f2f2;
+            border-radius:8px;
+            font-size:1.3rem;
+            font-weight:bold;
+            color:green;">
+
+            Danke an unseren Sponsor: @AktuellerSponsor
+        </div>
+        
     }
 }
 
 
-@code {
+    @code {
     private List<DocItem> Documents = new();
+    private SystemSettings? settings;
+    private bool isKursleiter;
 
-    protected override void OnInitialized()
+    private List<string> Sponsoren = new();
+    private int sponsorIndex = 0;
+    private System.Timers.Timer? sponsorTimer;
+
+    private string AktuellerSponsor =>
+        Sponsoren.Count > 0
+            ? Sponsoren[sponsorIndex]
+            : string.Empty;
+
+    protected override async Task OnInitializedAsync()
     {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        settings = await Db.SystemSettings.FirstOrDefaultAsync();
+
+
+        isKursleiter = user.IsInRole("Kursleiter") || user.IsInRole("Admin");
+
         var folder = Path.Combine(Env.WebRootPath, "configsheets/Informationen");
 
         var files = Directory.GetFiles(folder, "*.docx");
@@ -37,11 +125,89 @@ else
                 Title = Regex.Replace(Path.GetFileNameWithoutExtension(file), @"\d+\s", ""),
                 Html = DocxService.ConvertToHtml(file)
             }).ToList();
+
+        LoadSponsors();
+        StartSponsorTimer();
     }
 
     private class DocItem
     {
         public string Title { get; set; } = "";
         public string Html { get; set; } = "";
+    }
+
+    private void LoadSponsors()
+    {
+        var sponsorDatei = Path.Combine(
+            Env.WebRootPath,
+            "configsheets/Informationen",
+            "Sponsoren.docx");
+
+        if (!File.Exists(sponsorDatei))
+            return;
+
+        var html = DocxService.ConvertToHtml(sponsorDatei);
+
+        // CSS- und Script-Bereiche vollständig entfernen
+        html = Regex.Replace(
+            html,
+            @"<style[^>]*>.*?</style>",
+            "",
+            RegexOptions.IgnoreCase | RegexOptions.Singleline);
+
+        html = Regex.Replace(
+            html,
+            @"<script[^>]*>.*?</script>",
+            "",
+            RegexOptions.IgnoreCase | RegexOptions.Singleline);
+
+        // Absätze und Zeilenumbrüche in echte Zeilenumbrüche umwandeln
+        html = Regex.Replace(
+            html,
+            @"</?(p|div|li|br)[^>]*>",
+            "\n",
+            RegexOptions.IgnoreCase);
+
+        // Alle übrigen HTML-Tags entfernen
+        var text = Regex.Replace(html, @"<[^>]+>", "");
+
+        // HTML-Zeichen wie &amp; zurückwandeln
+        text = System.Net.WebUtility.HtmlDecode(text);
+
+        Sponsoren = text
+            .Split(
+                new[] { '\r', '\n' },
+                StringSplitOptions.RemoveEmptyEntries)
+            .Select(x => x.Trim())
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Distinct()
+            .ToList();
+    }
+
+    private void StartSponsorTimer()
+    {
+        if (Sponsoren.Count <= 1)
+            return;
+
+        sponsorTimer = new System.Timers.Timer(10_000);
+
+        sponsorTimer.Elapsed += async (_, _) =>
+        {
+            sponsorIndex++;
+
+            if (sponsorIndex >= Sponsoren.Count)
+                sponsorIndex = 0;
+
+            await InvokeAsync(StateHasChanged);
+        };
+
+        sponsorTimer.AutoReset = true;
+        sponsorTimer.Start();
+    }
+
+    public void Dispose()
+    {
+        sponsorTimer?.Stop();
+        sponsorTimer?.Dispose();
     }
 }
