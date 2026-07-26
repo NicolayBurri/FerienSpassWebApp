@@ -10,7 +10,7 @@
 @using Microsoft.AspNetCore.Components.Authorization
 @using System.Timers
 
-@inject ApplicationDbContext Db
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject DocxService DocxService
 @inject IWebHostEnvironment Env
@@ -108,23 +108,36 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        await using var Db = await DbFactory.CreateDbContextAsync();
+
         var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
         var user = authState.User;
 
-        settings = await Db.SystemSettings.FirstOrDefaultAsync();
+        settings = await Db.SystemSettings
+            .AsNoTracking()
+            .FirstOrDefaultAsync();
 
+        isKursleiter =
+            user.IsInRole("Kursleiter") ||
+            user.IsInRole("Admin");
 
-        isKursleiter = user.IsInRole("Kursleiter") || user.IsInRole("Admin");
+        var folder = Path.Combine(
+            Env.WebRootPath,
+            "configsheets/Informationen");
 
-        var folder = Path.Combine(Env.WebRootPath, "configsheets/Informationen");
+        if (Directory.Exists(folder))
+        {
+            var files = Directory.GetFiles(folder, "*.docx");
 
-        var files = Directory.GetFiles(folder, "*.docx");
-
-        Documents = files.Select(file => new DocItem
-            {
-                Title = Regex.Replace(Path.GetFileNameWithoutExtension(file), @"\d+\s", ""),
-                Html = DocxService.ConvertToHtml(file)
-            }).ToList();
+            Documents = files.Select(file => new DocItem
+                {
+                    Title = Regex.Replace(
+                        Path.GetFileNameWithoutExtension(file),
+                        @"\d+\s",
+                        ""),
+                    Html = DocxService.ConvertToHtml(file)
+                }).ToList();
+        }
 
         LoadSponsors();
         StartSponsorTimer();
