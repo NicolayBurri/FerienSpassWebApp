@@ -125,7 +125,7 @@ else
 
                     <p><strong>Kategorie:</strong> @ev.Kategorie</p>
 
-                    <p><strong>Treffpunkt</strong> @ev.Treffpunkt</p>
+                    <p><strong>Treffpunkt:</strong> @ev.Treffpunkt</p>
 
                     <p><strong>Veranstaltungsort:</strong> @ev.Location</p>
 
@@ -135,6 +135,34 @@ else
                         <strong>Mindest- und Maximalkapazität:</strong>
                         @ev.MinKinder - @ev.MaxKinder Kinder
                     </p>
+
+                    <p>
+                        <strong>Klassenbeschränkung: </strong>
+
+                        @if (ev.KlasseMin == null && ev.KlasseMax == null){
+                            <span>Keine Alterbeschränkung vorgesehen</span>
+                        }
+                        else{
+                        @(ev.KlasseMin?.GetDisplayName() ?? "Keine Mindestklassenbeschränkung")
+                        <span> - </span>
+                        @(ev.KlasseMax?.GetDisplayName() ?? "Keine Maximalklassenbeschränkung")
+                        }
+
+                    </p>
+
+                    <h4>Kursleiter</h4>
+
+                    @if (ev.Kursleiter?.Any() == true)
+                    {
+                        @foreach (var kl in ev.Kursleiter)
+                        {
+                            <p>@kl.User?.Vorname @kl.User?.Nachname</p>
+                        }
+                    }
+                    else
+                    {
+                        <p>Es ist noch kein Kursleiter definiert.</p>
+                    }
 
                     @if (availabilityByEvent.TryGetValue(ev.Id, out var av))
                     {
@@ -156,25 +184,6 @@ else
                                 AUSGEBUCHT
                             </p>
                         }
-                    }
-
-                    <p>
-                        <strong>Klassenbeschränkung: </strong>
-                        @ev.KlasseMin - @ev.KlasseMax
-                    </p>
-
-                    <h4>Kursleiter</h4>
-
-                    @if (ev.Kursleiter?.Any() == true)
-                    {
-                        @foreach (var kl in ev.Kursleiter)
-                        {
-                            <p>@kl.User?.Vorname @kl.User?.Nachname</p>
-                        }
-                    }
-                    else
-                    {
-                        <p>Es ist noch kein Kursleiter definiert.</p>
                     }
 
                     <button class="btn btn-sm btn-primary"

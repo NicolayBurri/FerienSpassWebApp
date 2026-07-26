@@ -47,4 +47,8 @@
     <PackageReference Include="System.Drawing.Common" Version="10.0.7" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Pages\User\NewFolder\" />
+  </ItemGroup>
+
 </Project>

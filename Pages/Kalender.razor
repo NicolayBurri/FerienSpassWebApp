@@ -79,7 +79,7 @@ else
                     </p>
 
                     <p>
-                        <strong>Eventlocation:</strong>
+                        <strong>Veranstaltungsort:</strong>
                         @ev.Location
                     </p>
 
@@ -94,8 +94,18 @@ else
                     </p>
 
                     <p>
-                        <strong>Klassenbeschränkung:</strong>
-                        @ev.KlasseMin - @ev.KlasseMax
+                        <strong>Klassenbeschränkung: </strong>
+                        @if (ev.KlasseMin == null && ev.KlasseMax == null)
+                        {
+                            <span>Keine Alterbeschränkung vorgesehen</span>
+                        }
+                        else
+                        {
+                            @(ev.KlasseMin?.GetDisplayName() ?? "Keine Mindestklassenbeschränkung")
+                            <span> - </span>
+                            @(ev.KlasseMax?.GetDisplayName() ?? "Keine Maximalklassenbeschränkung")
+                        }
+
                     </p>
                 </div>
 

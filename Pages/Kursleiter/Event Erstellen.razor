@@ -92,7 +92,7 @@
         <option value="">Keine Einschränkung</option>
         @foreach (var k in Enum.GetValues<KlasseStufe>())
             {
-            <option value="@k">@k</option>
+            <option value="@k">@k.GetDisplayName()</option>
         }
     </select>
 
@@ -101,7 +101,7 @@
         <option value="">Keine Einschränkung</option>
         @foreach (var k in Enum.GetValues<KlasseStufe>())
         {
-            <option value="@k">@k</option>
+            <option value="@k">@k.GetDisplayName()</option>
         }
     </select>
 
