@@ -655,12 +655,36 @@ else
     {
         await using var Db = await DbFactory.CreateDbContextAsync();
         var entry = await Db.EventChildren
+            .Include(x => x.Child)
+            .Include(x => x.Event)
             .FirstOrDefaultAsync(x =>
                 x.EventId == eventId &&
                 x.ChildId == childId);
 
         if (entry == null)
             return;
+
+        var invoice = await Db.Invoices
+            .Where(x =>
+                x.ParentUserId == entry.Child.ParentUserId &&
+                x.Status == InvoiceStatus.Paid)
+            .OrderByDescending(x => x.CreatedAt)
+            .FirstOrDefaultAsync();
+
+        if (invoice != null)
+        {
+            Db.RefundRequests.Add(new RefundRequest
+                {
+                    InvoiceId = invoice.Id,
+                    EventId = entry.EventId,
+                    EventName = entry.Event.Eventname,
+                    ChildId = entry.ChildId,
+                    ChildName = entry.Child.Name,
+                    Amount = entry.Event.price,
+                    CreatedAt = DateTime.Now,
+                    IsRefundet = false
+                });
+        }
 
         Db.EventChildren.Remove(entry);
         await Db.SaveChangesAsync();

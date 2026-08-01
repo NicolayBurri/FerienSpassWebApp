@@ -15,11 +15,11 @@
     }
     else
     {
-            <p>Danke für Ihr interesse. Hier finden Sie unsere AGBs.</p>
+            <p style="font-size:30px;">Danke für Ihr interesse. Hier finden Sie unsere AGBs.</p>
 
             @foreach (var doc in Documents)
             {
-                <SurveyPrompt Title="@doc.Title" Content="@doc.Html" />
+                <SurveyPrompt Title="@doc.Title" Content="@doc.Html"/>
             }
 
     }

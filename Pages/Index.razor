@@ -73,6 +73,31 @@ else
         Nur dank ihrer Hilfe ist es uns möglich, den Kindern
         spannende und erschwingliche Kurse anzubieten!
     </h3>
+    <br />
+
+    <div style="margin-top:40px;
+            padding:15px;
+            text-align:center;
+            background:lightgreen;
+            border-radius:8px;
+            font-size:1.3rem;
+            font-weight:bold;
+            color:darkgreen;">
+
+            Ein Herzliches Dankeschön an unsere Hauptsponsoren:
+            <br />
+            <br />
+            Einwohnergemeinde Rohrbach, 4938 Rohrbach
+            <br />
+            Einwohnergemeinde Auswil, 4944 Auswil    
+            <br />
+            Einwohnergemeinde Rohrbachgraben, 4938 Rohrbachgraben
+
+        </div>
+
+
+
+
     @if (!string.IsNullOrWhiteSpace(AktuellerSponsor))
     {
         
@@ -92,7 +117,7 @@ else
 }
 
 
-    @code {
+@code {
     private List<DocItem> Documents = new();
     private SystemSettings? settings;
     private bool isKursleiter;
@@ -193,8 +218,14 @@ else
                 StringSplitOptions.RemoveEmptyEntries)
             .Select(x => x.Trim())
             .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Where(x => !x.Equals("doc", StringComparison.OrdinalIgnoreCase))
             .Distinct()
             .ToList();
+
+        if (Sponsoren.Count > 0)
+        {
+            sponsorIndex = Random.Shared.Next(Sponsoren.Count);
+        }
     }
 
     private void StartSponsorTimer()
@@ -206,7 +237,7 @@ else
 
         sponsorTimer.Elapsed += async (_, _) =>
         {
-            sponsorIndex++;
+            sponsorIndex = Random.Shared.Next(Sponsoren.Count);
 
             if (sponsorIndex >= Sponsoren.Count)
                 sponsorIndex = 0;

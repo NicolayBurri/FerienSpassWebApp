@@ -6,8 +6,10 @@
 @using Microsoft.AspNetCore.Authorization
 
 @attribute [Authorize(Roles = "Admin,Kursleiter")]
-@inject NavigationManager Nav
+
 @inject IDbContextFactory<ApplicationDbContext> DbFactory
+
+<PageTitle>Rechnungsverwaltung</PageTitle>
 
 <h3>Rechnungsverwaltung</h3>
 
@@ -40,11 +42,14 @@ else
             <tr>
                 <th>Referenz</th>
                 <th>Familie</th>
-                <th>Email</th>
+                <th>E-Mail</th>
                 <th>Datum</th>
                 <th>Total</th>
                 <th>Status</th>
-                <AuthorizeView Roles="Admin"><th>Ändern</th></AuthorizeView>
+
+                <AuthorizeView Roles="Admin">
+                    <th>Ändern</th>
+                </AuthorizeView>
             </tr>
         </thead>
 
@@ -52,6 +57,10 @@ else
 
             @foreach (var invoice in pagedInvoices)
             {
+                var refunds = refundRequests
+                .Where(x => x.InvoiceId == invoice.Id)
+                .ToList();
+
                 <tr>
                     <td>@invoice.Reference</td>
 
@@ -64,13 +73,13 @@ else
                     <td>CHF @invoice.TotalAmount</td>
 
                     <td>
-                        <span style="color:@GetColor(invoice.Status)">
+                        <span style="color:@GetColor(invoice.Status); font-weight:bold;">
                             @GetText(invoice.Status)
                         </span>
                     </td>
 
-                    <td>
-                        <AuthorizeView Roles="Admin">
+                    <AuthorizeView Roles="Admin">
+                        <td>
                             <select class="form-select"
                                     value="@invoice.Status"
                                     @onchange="e => ChangeStatus(invoice, e.Value?.ToString())">
@@ -78,13 +87,76 @@ else
                                 <option value="Open">Offen</option>
                                 <option value="Reminder">Mahnung</option>
                                 <option value="Paid">Bezahlt</option>
-                                <option value="Refunded">Zurückerstattet</option>
-                                <option value="PartlyRefundet">Teils Zurückerstattet</option>
+
+                                @if (invoice.Status == InvoiceStatus.PartlyRefundet)
+                                {
+                                    <option value="PartlyRefundet">
+                                        Teilweise zurückerstattet
+                                    </option>
+                                }
+
+                                @if (invoice.Status == InvoiceStatus.Refunded)
+                                {
+                                    <option value="Refunded">
+                                        Zurückerstattet
+                                    </option>
+                                }
 
                             </select>
-                        </AuthorizeView>
-                    </td>
+                        </td>
+                    </AuthorizeView>
                 </tr>
+
+                @if (refunds.Any())
+                {
+                    <tr>
+                        <td colspan="7"
+                            style="background:#fff3cd;
+                                   color:#842029;
+                                   font-weight:bold;">
+
+                            <div style="margin-bottom:10px;">
+                                Rückerstattung erforderlich:
+                            </div>
+
+                            @foreach (var refund in refunds)
+                            {
+                                <div style="display:flex;
+                                            align-items:center;
+                                            justify-content:space-between;
+                                            flex-wrap:wrap;
+                                            gap:10px;
+                                            padding:10px;
+                                            margin-bottom:8px;
+                                            background:white;
+                                            border:1px solid #e5c365;
+                                            border-radius:6px;">
+
+                                    <span>
+                                        @refund.ChildName –
+                                        @refund.EventName –
+                                        CHF @refund.Amount
+                                    </span>
+
+                                    <AuthorizeView Roles="Admin">
+                                        <button class="btn btn-sm btn-success"
+                                                @onclick="() => ConfirmRefund(refund.Id)">
+                                            Rückerstattung bestätigen
+                                        </button>
+                                    </AuthorizeView>
+
+                                </div>
+                            }
+
+                            <AuthorizeView Roles="Kursleiter">
+                                <p style="margin:8px 0 0 0;">
+                                    Die Rückerstattung muss durch einen Administrator bestätigt werden.
+                                </p>
+                            </AuthorizeView>
+
+                        </td>
+                    </tr>
+                }
             }
 
         </tbody>
@@ -93,7 +165,8 @@ else
 
     @if (totalPages > 1)
     {
-        <div class="mt-3" style="display:flex; gap:8px; flex-wrap:wrap;">
+        <div class="mt-3"
+             style="display:flex; gap:8px; flex-wrap:wrap;">
 
             <button class="btn btn-secondary"
                     @onclick="PreviousPage"
@@ -103,11 +176,13 @@ else
 
             @for (int i = 1; i <= totalPages; i++)
             {
-                var pagenumber = i;
+                var pageNumber = i;
 
-                <button class="btn @(pagenumber == currentPage ? "btn-primary" : "btn-outline-primary")"
-                        @onclick="() => GoToPage(pagenumber)">
-                    @pagenumber
+                <button class="btn @(pageNumber == currentPage
+                    ? "btn-primary"
+                    : "btn-outline-primary")"
+                        @onclick="() => GoToPage(pageNumber)">
+                    @pageNumber
                 </button>
             }
 
@@ -122,8 +197,8 @@ else
 }
 
 @code {
-
     private List<Invoice> invoices = new();
+    private List<RefundRequest> refundRequests = new();
 
     private string? searchReference;
 
@@ -139,89 +214,200 @@ else
     private int totalPages =>
         (int)Math.Ceiling(invoices.Count / (double)pageSize);
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
-        LoadInvoices();
+        await LoadInvoices();
     }
 
-    void LoadInvoices()
+    private async Task LoadInvoices()
     {
-        using var Db = DbFactory.CreateDbContext();
-        invoices = Db.Invoices
+        await using var Db =
+            await DbFactory.CreateDbContextAsync();
+
+        invoices = await Db.Invoices
+            .AsNoTracking()
             .Include(x => x.ParentUser)
             .OrderByDescending(x => x.CreatedAt)
-            .ToList();
+            .ToListAsync();
+
+        // Nur noch nicht bestätigte Rückerstattungen anzeigen
+        refundRequests = await Db.RefundRequests
+            .AsNoTracking()
+            .Where(x => !x.IsRefundet)
+            .OrderByDescending(x => x.CreatedAt)
+            .ToListAsync();
 
         if (currentPage > totalPages)
         {
-            currentPage = totalPages == 0 ? 1 : totalPages;
+            currentPage = totalPages == 0
+                ? 1
+                : totalPages;
         }
     }
 
-    void GoToPage(int page)
+    private void GoToPage(int page)
     {
         currentPage = page;
     }
 
-    void NextPage()
+    private void NextPage()
     {
         if (currentPage < totalPages)
+        {
             currentPage++;
+        }
     }
 
-    void PreviousPage()
+    private void PreviousPage()
     {
         if (currentPage > 1)
+        {
             currentPage--;
+        }
     }
 
-    async Task MarkAsPaid()
+    private async Task MarkAsPaid()
     {
-        using var Db = DbFactory.CreateDbContext();
         if (string.IsNullOrWhiteSpace(searchReference))
+        {
             return;
+        }
 
-        var invoice = Db.Invoices
-            .FirstOrDefault(x => x.Reference == searchReference);
+        await using var Db =
+            await DbFactory.CreateDbContextAsync();
+
+        var invoice = await Db.Invoices
+            .FirstOrDefaultAsync(x =>
+                x.Reference == searchReference.Trim());
 
         if (invoice == null)
+        {
             return;
+        }
 
         invoice.Status = InvoiceStatus.Paid;
         invoice.PaidAt = DateTime.Now;
 
         await Db.SaveChangesAsync();
-
-        LoadInvoices();
+        await LoadInvoices();
     }
 
-    async Task ChangeStatus(Invoice invoice, string? value)
+    private async Task ChangeStatus(
+        Invoice invoice,
+        string? value)
     {
-        using var Db = DbFactory.CreateDbContext();
-
         if (string.IsNullOrWhiteSpace(value))
+        {
             return;
+        }
+
+        if (!Enum.TryParse<InvoiceStatus>(
+                value,
+                out var newStatus))
+        {
+            return;
+        }
+
+        // Rückerstattungsstatus dürfen nur durch
+        // einzelne Bestätigungen gesetzt werden.
+        if (newStatus == InvoiceStatus.Refunded ||
+            newStatus == InvoiceStatus.PartlyRefundet)
+        {
+            return;
+        }
+
+        await using var Db =
+            await DbFactory.CreateDbContextAsync();
 
         var dbInvoice = await Db.Invoices
-            .FirstOrDefaultAsync(x => x.Id == invoice.Id);
+            .FirstOrDefaultAsync(x =>
+                x.Id == invoice.Id);
 
         if (dbInvoice == null)
+        {
             return;
+        }
 
-        dbInvoice.Status = Enum.Parse<InvoiceStatus>(value);
+        dbInvoice.Status = newStatus;
 
-        if (dbInvoice.Status == InvoiceStatus.Paid)
+        if (newStatus == InvoiceStatus.Paid)
+        {
             dbInvoice.PaidAt = DateTime.Now;
+        }
 
-        if (dbInvoice.Status == InvoiceStatus.Reminder)
+        if (newStatus == InvoiceStatus.Reminder)
+        {
             dbInvoice.ReminderSentAt = DateTime.Now;
+        }
+
+        await Db.SaveChangesAsync();
+        await LoadInvoices();
+    }
+
+    private async Task ConfirmRefund(int refundId)
+    {
+        await using var Db =
+            await DbFactory.CreateDbContextAsync();
+
+        var refund = await Db.RefundRequests
+            .FirstOrDefaultAsync(x =>
+                x.Id == refundId);
+
+        if (refund == null || refund.IsRefundet)
+        {
+            return;
+        }
+
+        refund.IsRefundet = true;
 
         await Db.SaveChangesAsync();
 
-        LoadInvoices();
+        await UpdateInvoiceRefundStatus(
+            Db,
+            refund.InvoiceId);
+
+        await LoadInvoices();
     }
 
-    string GetColor(InvoiceStatus status)
+    private static async Task UpdateInvoiceRefundStatus(
+        ApplicationDbContext Db,
+        int invoiceId)
+    {
+        var invoice = await Db.Invoices
+            .FirstOrDefaultAsync(x =>
+                x.Id == invoiceId);
+
+        if (invoice == null)
+        {
+            return;
+        }
+
+        var refunds = await Db.RefundRequests
+            .Where(x => x.InvoiceId == invoiceId)
+            .ToListAsync();
+
+        if (!refunds.Any())
+        {
+            return;
+        }
+
+        var confirmedCount =
+            refunds.Count(x => x.IsRefundet);
+
+        if (confirmedCount == refunds.Count)
+        {
+            invoice.Status = InvoiceStatus.Refunded;
+        }
+        else if (confirmedCount > 0)
+        {
+            invoice.Status = InvoiceStatus.PartlyRefundet;
+        }
+
+        await Db.SaveChangesAsync();
+    }
+
+    private static string GetColor(
+        InvoiceStatus status)
     {
         return status switch
         {
@@ -234,7 +420,8 @@ else
         };
     }
 
-    string GetText(InvoiceStatus status)
+    private static string GetText(
+        InvoiceStatus status)
     {
         return status switch
         {
@@ -242,8 +429,10 @@ else
             InvoiceStatus.Reminder => "Mahnung",
             InvoiceStatus.Paid => "Bezahlt",
             InvoiceStatus.Refunded => "Zurückerstattet",
-            InvoiceStatus.PartlyRefundet => "Teilweise Zurückerstattet",
+            InvoiceStatus.PartlyRefundet =>
+                "Teilweise zurückerstattet",
             _ => "-"
         };
     }
 }
+```

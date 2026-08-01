@@ -27,6 +27,8 @@ namespace FerienspassWebApp.Data
 
         public DbSet<SystemSettings> SystemSettings { get; set; }
 
+        public DbSet<RefundRequest> RefundRequests { get; set; }
+
 
 
         protected override void OnModelCreating(ModelBuilder builder)

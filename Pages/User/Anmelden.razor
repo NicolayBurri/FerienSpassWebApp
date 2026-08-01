@@ -331,19 +331,35 @@ else
 
     async Task Register()
     {
-        await using var Db = await DbFactory.CreateDbContextAsync();
         if (isSubmitting)
             return;
 
         isSubmitting = true;
         results.Clear();
+        anyChildConfirmed = false;
 
         try
         {
+            await using var Db = await DbFactory.CreateDbContextAsync();
+
             if (ev == null)
                 return;
 
-            var settings = await Db.SystemSettings.FirstOrDefaultAsync();
+            if (!selectedChildren.Any())
+            {
+                results.Add(new RegistrationResult
+                    {
+                        ChildName = "",
+                        Status = "Bitte mindestens ein Kind auswählen",
+                        Color = "red"
+                    });
+
+                showPopup = true;
+                return;
+            }
+
+            var settings = await Db.SystemSettings
+                .FirstOrDefaultAsync();
 
             if (settings == null)
             {
@@ -353,20 +369,27 @@ else
                         Status = "System nicht konfiguriert",
                         Color = "red"
                     });
+
+                showPopup = true;
                 return;
             }
 
             var now = DateTime.Now;
 
             bool kursleiterPhase =
-                settings.KursleiterStart <= now &&
-                settings.KursleiterEnde >= now;
+                settings.KursleiterStart.HasValue &&
+                settings.KursleiterEnde.HasValue &&
+                settings.KursleiterStart.Value <= now &&
+                settings.KursleiterEnde.Value >= now;
 
             bool elternPhase =
-                settings.AnmeldungStart <= now &&
-                settings.AnmeldungEnde >= now;
+                settings.AnmeldungStart.HasValue &&
+                settings.AnmeldungEnde.HasValue &&
+                settings.AnmeldungStart.Value <= now &&
+                settings.AnmeldungEnde.Value >= now;
 
-            var auth = await AuthStateProvider.GetAuthenticationStateAsync();
+            var auth =
+                await AuthStateProvider.GetAuthenticationStateAsync();
 
             bool isKursleiterUser =
                 auth.User.IsInRole("Kursleiter") ||
@@ -403,9 +426,23 @@ else
                 }
             }
 
-            using var transaction =
+            await using var transaction =
                 await Db.Database.BeginTransactionAsync(
                     System.Data.IsolationLevel.Serializable);
+
+            /*
+             * Die Anzahl wird einmal vor der Schleife aus der Datenbank geladen.
+             * Nach jedem hinzugefügten Kind wird der lokale Zähler erhöht.
+             */
+            int currentConfirmed =
+                await Db.EventChildren.CountAsync(x =>
+                    x.EventId == ev.Id &&
+                    x.Status == EnrollmentStatus.Confirmed);
+
+            int currentWaiting =
+                await Db.EventChildren.CountAsync(x =>
+                    x.EventId == ev.Id &&
+                    x.Status == EnrollmentStatus.WaitingList);
 
             foreach (var childId in selectedChildren)
             {
@@ -430,28 +467,35 @@ else
                             Status = "bereits angemeldet",
                             Color = "orange"
                         });
+
                     continue;
                 }
 
-                if (ev.KlasseMin.HasValue && child.Klasse < ev.KlasseMin.Value)
+                if (ev.KlasseMin.HasValue &&
+                    child.Klasse < ev.KlasseMin.Value)
                 {
                     results.Add(new RegistrationResult
                         {
                             ChildName = child.Name,
-                            Status = $"Klassenstufe zu tief: ({child.Klasse})",
+                            Status =
+                                $"Klassenstufe zu tief: ({child.Klasse})",
                             Color = "red"
                         });
+
                     continue;
                 }
 
-                if (ev.KlasseMax.HasValue && child.Klasse > ev.KlasseMax.Value)
+                if (ev.KlasseMax.HasValue &&
+                    child.Klasse > ev.KlasseMax.Value)
                 {
                     results.Add(new RegistrationResult
                         {
                             ChildName = child.Name,
-                            Status = $"Klassenstufe zu hoch: ({child.Klasse})",
+                            Status =
+                                $"Klassenstufe zu hoch: ({child.Klasse})",
                             Color = "red"
                         });
+
                     continue;
                 }
 
@@ -469,29 +513,27 @@ else
                             Status = "Zeitkonflikt",
                             Color = "red"
                         });
+
                     continue;
                 }
-
-                int currentConfirmed =
-                    await Db.EventChildren.CountAsync(x =>
-                        x.EventId == ev.Id &&
-                        x.Status == EnrollmentStatus.Confirmed);
-
-                int currentWaiting =
-                    await Db.EventChildren.CountAsync(x =>
-                        x.EventId == ev.Id &&
-                        x.Status == EnrollmentStatus.WaitingList);
 
                 EnrollmentStatus status;
 
                 if (currentConfirmed < ev.MaxKinder)
                 {
                     status = EnrollmentStatus.Confirmed;
+
+                    // Platz sofort lokal reservieren
+                    currentConfirmed++;
+
                     anyChildConfirmed = true;
                 }
                 else if (currentWaiting < ev.WaitlisteLimit)
                 {
                     status = EnrollmentStatus.WaitingList;
+
+                    // Wartelistenplatz sofort lokal reservieren
+                    currentWaiting++;
                 }
                 else
                 {
@@ -501,6 +543,7 @@ else
                             Status = "kein Platz verfügbar",
                             Color = "red"
                         });
+
                     continue;
                 }
 
@@ -520,18 +563,23 @@ else
                             : "Warteliste",
                         Color = status == EnrollmentStatus.Confirmed
                             ? "green"
-                            : "darkorange"
+                            : "darkorange",
+                        WasSuccessful = true
                     });
             }
 
+            /*
+             * Fahrer oder Helfer nur speichern, wenn mindestens
+             * ein Kind tatsächlich bestätigt wurde.
+             */
             if (!anyChildConfirmed && (willDrive || willHelp))
             {
                 results.Add(new RegistrationResult
                     {
                         ChildName = "",
-                        Status = "Fahrer/Helfer nur erlaubt wenn mindestens ein Kind bestätigt wurde",
+                        Status =
+                            "Fahrer/Helfer nur erlaubt, wenn mindestens ein Kind bestätigt wurde",
                         Color = "red"
-
                     });
 
                 showPopup = true;
@@ -540,28 +588,28 @@ else
 
             await Db.SaveChangesAsync();
 
-
             if (willDrive)
             {
-                Db.EventRoleAssignments.Add(new EventRoleAssignment
-                    {
-                        EventId = ev.Id,
-                        UserId = currentUserId!,
-                        Role = RoleType.Driver,
-                        Seats = driverSeats
-                    });
+                Db.EventRoleAssignments.Add(
+                    new EventRoleAssignment
+                        {
+                            EventId = ev.Id,
+                            UserId = currentUserId!,
+                            Role = RoleType.Driver,
+                            Seats = driverSeats
+                        });
             }
 
             if (willHelp)
             {
-                Db.EventRoleAssignments.Add(new EventRoleAssignment
-                    {
-                        EventId = ev.Id,
-                        UserId = currentUserId!,
-                        Role = RoleType.Helper
-                    });
+                Db.EventRoleAssignments.Add(
+                    new EventRoleAssignment
+                        {
+                            EventId = ev.Id,
+                            UserId = currentUserId!,
+                            Role = RoleType.Helper
+                        });
             }
-
 
             await Db.SaveChangesAsync();
             await transaction.CommitAsync();
@@ -576,6 +624,8 @@ else
                     Status = $"Fehler: {ex.Message}",
                     Color = "red"
                 });
+
+            showPopup = true;
         }
         finally
         {

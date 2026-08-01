@@ -131,6 +131,8 @@ a, .btn-link {
 }
 
 .responsive-img{
+    display:block;
     height: auto;
     max-width:90%;
+    margin: 0 auto;
 }
