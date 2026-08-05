@@ -65,7 +65,8 @@ a, .btn-link {
 
 
 .custom-navbar {
-    max-width: 100%;
+    width: 100%;
+    max-width:none;
     display: grid;
     grid-template-columns: 1fr auto 1fr;
     align-items: center;
@@ -96,7 +97,9 @@ a, .btn-link {
 }
 
 .left-side{
-    /*Leer um Grid stabil zu halten*/
+    display: flex;
+    justify-content: flex-start;
+    align-items:center;
 }
 
 .child-row{

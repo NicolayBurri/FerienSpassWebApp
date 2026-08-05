@@ -49,6 +49,7 @@
 
   <ItemGroup>
     <Folder Include="Pages\User\NewFolder\" />
+    <Folder Include="PrivateFiles\F&amp;Q\" />
   </ItemGroup>
 
 </Project>

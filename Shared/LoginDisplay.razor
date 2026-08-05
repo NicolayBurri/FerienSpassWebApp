@@ -1,12 +1,32 @@
-﻿<AuthorizeView>
+﻿@using Microsoft.AspNetCore.Components.Authorization
+
+<AuthorizeView>
     <Authorized>
         <nav class="navbar custom-navbar">
 
-            <div class="left-side"></div>
+            <div class="left-side">
+
+                <a href="/F&Q"
+                   title="Fragen und Antworten"
+                   style="
+                        display:flex;
+                        justify-content:center;
+                        align-items:center;
+                        width:36px;
+                        height:36px;
+                        border-radius:50%;
+                        background:#0d6efd;
+                        color:white;
+                        text-decoration:none;
+                        font-size:22px;
+                        font-weight:bold;">
+                    ?
+                </a>
+            </div>
 
             <div class="center">
                 <picture>
-                    <source media="(max-widht:100; height:auto;)" srcset="Bilder/Ferienspass.png" />
+                    <source media="(max-width:100%; height:auto;)" srcset="Bilder/Ferienspass.png" />
                     <img src="Bilder/Ferienspass.png" alt="Ferienspass" class="responsive-img" />
                 </picture>
             </div>
@@ -31,18 +51,40 @@
     <NotAuthorized>
         <nav class="navbar custom-navbar">
 
-            <div class="left-side"></div>
+            <div class="left-side">
+
+                <a href="/F&Q"
+                   title="Fragen und Antworten"
+                   style="
+                        display:flex;
+                        justify-content:center;
+                        align-items:center;
+                        width:40px;
+                        height:40px;
+                        margin-left:10px;
+                        border-radius:50%;
+                        background:#0d6efd;
+                        color:white;
+                        text-decoration:none;
+                        font-size:22px;
+                        font-weight:bold;">
+                    ?
+                </a>
+
+            </div>
 
             <div class="center">
                 <picture>
-                    <source media="(max-widht:100; height:auto;)" srcset="Bilder/Ferienspass.png" />
+                    <source media="(max-width:100%; height:auto;)" srcset="Bilder/Ferienspass.png" />
                     <img src="Bilder/Ferienspass.png" alt="Ferienspass" class="responsive-img" />
                 </picture>
             </div>
 
             <div class="right-side">
+
                 <a href="Identity/Account/Register">Register</a>
                 <a href="Identity/Account/Login">Log in</a>
+
             </div>
 
         </nav>

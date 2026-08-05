@@ -43,6 +43,7 @@ builder.Services.AddSingleton<WeatherForecastService>();
 builder.Services.AddHttpClient();
 builder.Services.AddSingleton<DocxService>();
 builder.Services.AddTransient<IEmailSender, EmailService>();
+builder.Services.AddScoped<FaqDocumentService>();
 builder.Services
        .AddBlazorise()
        .AddBootstrap5Providers()

@@ -1,0 +1,110 @@
+﻿@page "/F&Q"
+
+@using FerienspassWebApp.Models
+@using FerienspassWebApp.Services
+
+@inject FaqDocumentService FaqDocumentService
+
+<PageTitle>Fragen und Antworten</PageTitle>
+
+<div class="faq-page">
+    <header class="faq-header">
+        <h1>Fragen und Antworten</h1>
+
+        <p>
+            Hier findest du Antworten auf häufig gestellte Fragen.
+        </p>
+    </header>
+
+    @if (isLoading)
+    {
+        <div class="faq-status">
+            Inhalte werden geladen …
+        </div>
+    }
+    else if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <div class="alert alert-danger" role="alert">
+            @errorMessage
+        </div>
+    }
+    else if (faqDocuments.Count == 0)
+    {
+        <div class="faq-empty">
+            Es sind noch keine Fragen und Antworten vorhanden.
+        </div>
+    }
+    else
+    {
+        <div class="faq-list">
+            @foreach (var faq in faqDocuments)
+            {
+                var isOpen = openDocumentId == faq.Id;
+                var contentId = $"faq-content-{ToSafeId(faq.Id)}";
+
+                <article class="faq-item @(isOpen ? "faq-item-open" : null)">
+                    <button type="button"
+                            class="faq-question"
+                            aria-expanded="@isOpen"
+                            aria-controls="@contentId"
+                            @onclick="() => ToggleFaq(faq.Id)">
+
+                        <span>@faq.Question</span>
+
+                        <span class="faq-icon" aria-hidden="true"></span>
+                    </button>
+
+                    @if (isOpen)
+                    {
+                        <div id="@contentId"
+                             class="faq-answer"
+                             role="region"
+                             aria-label="@faq.Question">
+
+                            @((MarkupString)faq.HtmlContent)
+                        </div>
+                    }
+                </article>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private List<FaqDocument> faqDocuments = [];
+    private string? openDocumentId;
+    private string? errorMessage;
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            faqDocuments = await FaqDocumentService.LoadFaqDocumentsAsync();
+        }
+        catch (Exception exception)
+        {
+            errorMessage = $"Die Inhalte konnten nicht geladen werden: {exception.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void ToggleFaq(string documentId)
+    {
+        openDocumentId = openDocumentId == documentId
+            ? null
+            : documentId;
+    }
+
+    private static string ToSafeId(string value)
+    {
+        return string.Concat(
+            value.Select(character =>
+                char.IsLetterOrDigit(character)
+                    ? character
+                    : '-'));
+    }
+}
