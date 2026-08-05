@@ -13,7 +13,10 @@
     <EmbeddedResource Remove="NewFolder\**" />
     <None Remove="NewFolder\**" />
   </ItemGroup>
-
+  <ItemGroup>
+    <RazorComponent Include="Pages\Faq.razor" />
+    <None Include="Pages\Faq.razor.css" />
+  </ItemGroup>
   <ItemGroup>
     <None Include="wwwroot\Bilder\Ferienspass.png" />
   </ItemGroup>
