@@ -109,29 +109,37 @@
     border-top: 0;
     color: #48515c;
     font-size: 1rem;
-    line-height: 1.5;
-    overflow-wrap: anywhere;
+    line-height: 1.6;
+    white-space: normal;
+    word-break: normal;
+    overflow-wrap: break-word;
+    hyphens: none;
 }
 
     .faq-answer ::deep p {
-        margin: 0 0 0.75rem;
+        margin: 0 0 1rem;
+        white-space: pre-wrap;
+        word-break: normal;
+        overflow-wrap: break-word;
+        hyphens: none;
     }
 
         .faq-answer ::deep p:last-child {
             margin-bottom: 0;
         }
 
+    .faq-answer ::deep .faq-empty-paragraph {
+        margin: 0;
+        min-height: 1rem;
+    }
+
     .faq-answer ::deep h2,
     .faq-answer ::deep h3,
     .faq-answer ::deep h4 {
         margin: 1.25rem 0 0.65rem;
-        color: #111111;
-    }
-
-    .faq-answer ::deep ul,
-    .faq-answer ::deep ol {
-        margin: 0.75rem 0;
-        padding-left: 1.5rem;
+        color: #111;
+        word-break: normal;
+        overflow-wrap: break-word;
     }
 
     .faq-answer ::deep .faq-word-image {
@@ -140,23 +148,6 @@
         height: auto;
         margin: 1rem 0;
     }
-
-    .faq-answer ::deep .faq-table-wrapper {
-        width: 100%;
-        margin: 1rem 0;
-        overflow-x: auto;
-    }
-
-    .faq-answer ::deep .faq-word-table {
-        width: 100%;
-        border-collapse: collapse;
-    }
-
-        .faq-answer ::deep .faq-word-table td {
-            padding: 0.65rem;
-            border: 1px solid #d5d5d5;
-            vertical-align: top;
-        }
 
 .faq-status,
 .faq-empty {

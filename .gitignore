@@ -2,7 +2,7 @@ bin/
 obj/
 .vs/
 publish/
-PrivateFiles/
+PrivateFiles/Rechnungen
 *.user
 *.suo
 appsettings.Production.json

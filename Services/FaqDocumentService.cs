@@ -126,32 +126,38 @@ public class FaqDocumentService
     }
 
     private static string ConvertParagraph(
-        Paragraph paragraph,
-        MainDocumentPart mainPart)
+    Paragraph paragraph,
+    MainDocumentPart mainPart)
     {
-        var paragraphText = new StringBuilder();
+        var content = new StringBuilder();
 
         foreach (var child in paragraph.ChildElements)
         {
             switch (child)
             {
                 case Run run:
-                    paragraphText.Append(ConvertRun(run, mainPart));
+                    content.Append(ConvertRun(run, mainPart));
                     break;
 
                 case Hyperlink hyperlink:
-                    foreach (var run in hyperlink.Elements<Run>())
+                    foreach (var hyperlinkChild in hyperlink.ChildElements)
                     {
-                        paragraphText.Append(ConvertRun(run, mainPart));
+                        if (hyperlinkChild is Run hyperlinkRun)
+                        {
+                            content.Append(
+                                ConvertRun(hyperlinkRun, mainPart));
+                        }
                     }
 
                     break;
             }
         }
 
-        if (paragraphText.Length == 0)
+        var paragraphContent = content.ToString();
+
+        if (string.IsNullOrWhiteSpace(paragraphContent))
         {
-            return "<br />";
+            return "<p class=\"faq-empty-paragraph\"><br /></p>";
         }
 
         var styleId = paragraph
@@ -163,51 +169,84 @@ public class FaqDocumentService
         var tag = styleId switch
         {
             "Title" => "h2",
-            "Heading1" or "berschrift1" => "h2",
-            "Heading2" or "berschrift2" => "h3",
-            "Heading3" or "berschrift3" => "h4",
+
+            "Heading1"
+                or "berschrift1"
+                or "Überschrift1" => "h2",
+
+            "Heading2"
+                or "berschrift2"
+                or "Überschrift2" => "h3",
+
+            "Heading3"
+                or "berschrift3"
+                or "Überschrift3" => "h4",
+
             _ => "p"
         };
 
-        return $"<{tag}>{paragraphText}</{tag}>";
+        return $"<{tag}>{paragraphContent}</{tag}>";
     }
 
     private static string ConvertRun(
-        Run run,
-        MainDocumentPart mainPart)
+     Run run,
+     MainDocumentPart mainPart)
     {
         var html = new StringBuilder();
 
-        foreach (var text in run.Elements<Text>())
+        // Elemente genau in der Reihenfolge verarbeiten,
+        // in der sie im Word-Dokument vorkommen.
+        foreach (var child in run.ChildElements)
         {
-            var encodedText = WebUtility.HtmlEncode(text.Text);
-
-            if (text.Space?.Value == DocumentFormat.OpenXml.SpaceProcessingModeValues.Preserve)
+            switch (child)
             {
-                encodedText = encodedText.Replace(" ", "&nbsp;");
-            }
+                case Text text:
+                    {
+                        var value = text.Text
+                            // Unsichtbare Word-Trennzeichen entfernen
+                            .Replace("\u00AD", string.Empty)
+                            .Replace("\u200B", string.Empty);
 
-            html.Append(encodedText);
-        }
+                        html.Append(WebUtility.HtmlEncode(value));
+                        break;
+                    }
 
-        foreach (var breakElement in run.Elements<Break>())
-        {
-            html.Append("<br />");
-        }
+                case Break:
+                    html.Append("<br />");
+                    break;
 
-        foreach (var drawing in run.Elements<Drawing>())
-        {
-            var imageHtml = ConvertDrawingToImage(drawing, mainPart);
+                case CarriageReturn:
+                    html.Append("<br />");
+                    break;
 
-            if (!string.IsNullOrWhiteSpace(imageHtml))
-            {
-                html.Append(imageHtml);
+                case TabChar:
+                    html.Append("&emsp;");
+                    break;
+
+                case SoftHyphen:
+                    // Weiches Trennzeichen nicht ausgeben,
+                    // damit Wörter nicht unerwartet getrennt werden.
+                    break;
+
+                case Drawing drawing:
+                    {
+                        var imageHtml = ConvertDrawingToImage(
+                            drawing,
+                            mainPart);
+
+                        if (!string.IsNullOrWhiteSpace(imageHtml))
+                        {
+                            html.Append(imageHtml);
+                        }
+
+                        break;
+                    }
             }
         }
 
         var content = html.ToString();
 
-        if (string.IsNullOrWhiteSpace(content))
+        if (string.IsNullOrEmpty(content))
         {
             return string.Empty;
         }
