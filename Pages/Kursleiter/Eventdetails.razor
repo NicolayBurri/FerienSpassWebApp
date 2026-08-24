@@ -236,6 +236,7 @@ else
         worksheet.Cell(1, 7).Value = "Telefonnummer";
         worksheet.Cell(1, 8).Value = "Beziehungsstatus";
         worksheet.Cell(1, 9).Value = "Besonderes";
+        worksheet.Cell(1, 10).Value = "Ort";
 
         int row = 2;
 
@@ -245,12 +246,31 @@ else
             .Where(x => x.ApplicationUserId == entry.Child.ParentUserId)
             .Select(x => new
             {
-                x.Name,
+                Name = x.Name,
                 Telefon = x.Telefon ?? "-",
                 Beziehung = x.Beziehung ?? "-"
             })
             .Take(1)
             .ToList();
+
+            if (!contacts.Any())
+            {
+                var parentContact = Db.Users
+                    .Where(x => x.Id == entry.Child.ParentUserId)
+                    .Select(x => new
+                    {
+                        Name = ((x.Vorname ?? "") + " " + (x.Nachname ?? "")).Trim(),
+                        Telefon = x.Telefonnummer ?? "-",
+                        Beziehung = "Kontoinhaber"
+                    })
+                    .FirstOrDefault();
+
+                if (parentContact != null)
+                {
+                    contacts.Add(parentContact);
+                }
+
+            }
 
             worksheet.Cell(row, 1).Value = $"{entry.Child.Name} {entry.Child.ParentUser?.Nachname}".Trim();
             worksheet.Cell(row, 2).Value = entry.Child.Alter;
@@ -276,6 +296,7 @@ else
             worksheet.Cell(row, 7).Value = contacts.ElementAtOrDefault(0)?.Telefon;
             worksheet.Cell(row, 8).Value = contacts.ElementAtOrDefault(0)?.Beziehung;
             worksheet.Cell(row, 9).Value = entry.Child.Besonderes;
+            worksheet.Cell(row, 10).Value = entry.Child.ParentUser?.Ort;
 
             row++;
         }
