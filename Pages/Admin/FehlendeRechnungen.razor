@@ -27,6 +27,7 @@ else
                 <th>Kind</th>
                 <th>Kurs</th>
                 <th>Preis</th>
+                <th>Email</th>
                 <th>Aktionen</th>
             </tr>
         </thead>
@@ -37,6 +38,7 @@ else
                     <td>@item.Child.Name @item.Child.ParentUser?.Nachname</td>
                     <td>@item.Event.Eventname</td>
                     <td>CHF @item.Event.price</td>
+                    <td>@item.Child.ParentUser?.Email</td>
                     <td>
                         <a class="btn btn-warning btn-sm"
                            href="@CreateMailLink(item)">
@@ -63,6 +65,7 @@ else
         await using var Db = await DbFactory.CreateDbContextAsync();
         items = await Db.EventChildren
             .Include(x => x.Child)
+                .ThenInclude(x => x.ParentUser)
             .Include(x => x.Event)
             .Where(x =>
                 x.Status == EnrollmentStatus.Confirmed &&
@@ -74,7 +77,9 @@ else
 
     private string CreateMailLink(EventChild item)
     {
-        var subject = Uri.EscapeDataString("Bitte Rechnung erstellen");
+        var recipient = item.Child.ParentUser?.Email ?? "";
+
+        var subject = Uri.EscapeDataString("Bitte Rechnung für FerienSpass erstellen");
 
         var body = Uri.EscapeDataString(
             $"Bitte die Rechnung für folgendes Kind erstellen:\n\n" +
@@ -82,7 +87,7 @@ else
             $"Kurs: {item.Event.Eventname}\n" +
             $"Betrag: CHF {item.Event.price}");
 
-        return $"mailto:?subject={subject}&body={body}";
+        return $"mailto:{recipient}?subject={subject}&body={body}";
     }
 
     private async Task RemoveChildFromCourse(EventChild item)
