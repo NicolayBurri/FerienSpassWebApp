@@ -4,6 +4,7 @@
 @using FerienspassWebApp.Data
 @using FerienspassWebApp.Models
 @using Microsoft.AspNetCore.Authorization
+@using System.Text
 
 @attribute [Authorize(Roles = "Admin")]
 @inject NavigationManager Nav
@@ -24,31 +25,54 @@ else
     <table class="table">
         <thead>
             <tr>
-                <th>Kind</th>
-                <th>Kurs</th>
-                <th>Preis</th>
+                <th>Account</th>
+                <th>Kinder / Kurse</th>
+                <th>Gesamt</th>
                 <th>Email</th>
                 <th>Aktionen</th>
             </tr>
         </thead>
+
         <tbody>
             @foreach (var item in items)
             {
                 <tr>
-                    <td>@item.Child.Name @item.Child.ParentUser?.Nachname</td>
-                    <td>@item.Event.Eventname</td>
-                    <td>CHF @item.Event.price</td>
-                    <td>@item.Child.ParentUser?.Email</td>
+                    <td>
+                        @item.ParentUser.Vorname @item.ParentUser.Nachname
+                    </td>
+
+                    <td>
+                        @foreach (var enrollment in item.Enrollments)
+                        {
+                            <div class="d-flex justify-content-between align-items-center mb-3 gap-1">
+                                <div>
+                                    <strong>@enrollment.Child.Name</strong><br />
+                                    @enrollment.Event.Eventname – CHF @enrollment.Event.price
+                                </div>
+
+                                <button class="btn btn-danger btn-sm flex-shrink-0"
+                                        @onclick="() => RemoveChildFromCourse(item, enrollment)">
+                                    Kind aus Kurs löschen
+                                </button>
+                            </div>
+                        }
+                    </td>
+
+                    <td>
+                        <strong>
+                            CHF @item.Enrollments.Sum(x => x.Event.price)
+                        </strong>
+                    </td>
+
+                    <td>
+                        @item.ParentUser.Email
+                    </td>
+
                     <td>
                         <a class="btn btn-warning btn-sm"
                            href="@CreateMailLink(item)">
                             Email generieren
                         </a>
-
-                        <button class="btn btn-danger btn-sm"
-                                @onclick="() => RemoveChildFromCourse(item)">
-                            Kind aus Kurs löschen
-                        </button>
                     </td>
                 </tr>
             }
@@ -58,12 +82,13 @@ else
 
 @code {
     private bool isLoading = true;
-    private List<EventChild> items = new();
+    private List<ParentInvoiceGroup> items = new();
 
     protected override async Task OnInitializedAsync()
     {
         await using var Db = await DbFactory.CreateDbContextAsync();
-        items = await Db.EventChildren
+
+        var eventChildren = await Db.EventChildren
             .Include(x => x.Child)
                 .ThenInclude(x => x.ParentUser)
             .Include(x => x.Event)
@@ -72,30 +97,78 @@ else
                 !x.IsInvoiced)
             .ToListAsync();
 
+        items = eventChildren
+            .Where(x => x.Child.ParentUser != null)
+            .GroupBy(x => x.Child.ParentUser!.Id)
+            .Select(g => new ParentInvoiceGroup
+                {
+                    ParentUser = g.First().Child.ParentUser!,
+                    Enrollments = g.ToList()
+                })
+            .ToList();
+
         isLoading = false;
     }
 
-    private string CreateMailLink(EventChild item)
+    private string CreateMailLink(ParentInvoiceGroup item)
     {
-        var recipient = item.Child.ParentUser?.Email ?? "";
+        var recipient = item.ParentUser.Email ?? "";
+        var subject = Uri.EscapeDataString(
+            "Bitte Rechnung für FerienSpass erstellen");
 
-        var subject = Uri.EscapeDataString("Bitte Rechnung für FerienSpass erstellen");
+        var text = new StringBuilder();
 
-        var body = Uri.EscapeDataString(
-            $"Bitte die Rechnung für folgendes Kind erstellen:\n\n" +
-            $"Kind: {item.Child.Name} {item.Child.ParentUser?.Nachname}\n" +
-            $"Kurs: {item.Event.Eventname}\n" +
-            $"Betrag: CHF {item.Event.price}");
+        text.AppendLine("Bitte die Rechnung für folgende Anmeldungen erstellen:");
+        text.AppendLine();
+
+        foreach (var enrollment in item.Enrollments)
+        {
+            text.AppendLine(
+                $"{enrollment.Child.Name} {item.ParentUser.Nachname}");
+            text.AppendLine(
+                $"Kurs: {enrollment.Event.Eventname}");
+            text.AppendLine(
+                $"Betrag: CHF {enrollment.Event.price}");
+            text.AppendLine();
+        }
+
+        var total = item.Enrollments.Sum(x => x.Event.price);
+
+        text.AppendLine($"Gesamtbetrag: CHF {total}");
+
+        var body = Uri.EscapeDataString(text.ToString());
 
         return $"mailto:{recipient}?subject={subject}&body={body}";
     }
 
-    private async Task RemoveChildFromCourse(EventChild item)
+    private class ParentInvoiceGroup
+    {
+        public ApplicationUser ParentUser { get; set; } = default!;
+        public List<EventChild> Enrollments { get; set; } = new();
+    }
+
+    private async Task RemoveChildFromCourse(
+    ParentInvoiceGroup group,
+    EventChild enrollment)
     {
         await using var Db = await DbFactory.CreateDbContextAsync();
-        Db.EventChildren.Remove(item);
+
+        var entity = await Db.EventChildren
+            .FirstOrDefaultAsync(x => x.Id == enrollment.Id);
+
+        if (entity == null)
+            return;
+
+        Db.EventChildren.Remove(entity);
         await Db.SaveChangesAsync();
 
-        items.Remove(item);
+        group.Enrollments.Remove(enrollment);
+
+        // Falls der Account keine offenen Kurse mehr hat,
+        // verschwindet die ganze Zeile.
+        if (!group.Enrollments.Any())
+        {
+            items.Remove(group);
+        }
     }
 }
