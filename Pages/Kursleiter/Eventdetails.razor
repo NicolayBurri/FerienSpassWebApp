@@ -67,6 +67,13 @@ else
 
     <h4>Anmeldungen</h4>
 
+    <span>Bestätigt: @GetCount(ev.Id, EnrollmentStatus.Confirmed)</span>
+    <br />
+    <span>Warteliste: @GetCount(ev.Id, EnrollmentStatus.WaitingList)</span>
+    <br />
+    <br />
+
+
     @if (registrations.Any())
     {
         @foreach (var entry in registrations)
@@ -449,17 +456,17 @@ else
     // =========================================================
 
     int availableSeats =>
-        roles
-            .Where(x => x.Role == RoleType.Driver)
-            .Sum(x => x.Seats ?? 0);
+    roles
+    .Where(x => x.Role == RoleType.Driver)
+    .Sum(x => x.Seats ?? 0);
 
     int requiredSeats =>
-        ev?.AnzahlSitzplaetze ?? 0;
+    ev?.AnzahlSitzplaetze ?? 0;
 
     int missingSeats =>
-        ev?.BrauchtFahrer == true
-            ? Math.Max(requiredSeats - availableSeats, 0)
-            : 0;
+    ev?.BrauchtFahrer == true
+    ? Math.Max(requiredSeats - availableSeats, 0)
+    : 0;
 
 
     // =========================================================
@@ -467,15 +474,15 @@ else
     // =========================================================
 
     int HelperCount =>
-        roles.Count(x => x.Role == RoleType.Helper);
+    roles.Count(x => x.Role == RoleType.Helper);
 
     int requiredHelper =>
-        ev?.AnzahlBetreuung ?? 0;
+    ev?.AnzahlBetreuung ?? 0;
 
     int missingHelper =>
-        ev?.BrauchtBetreuung == true
-            ? Math.Max(requiredHelper - HelperCount, 0)
-            : 0;
+    ev?.BrauchtBetreuung == true
+    ? Math.Max(requiredHelper - HelperCount, 0)
+    : 0;
 
 
     // =========================================================
@@ -905,19 +912,22 @@ else
         // TEILNEHMER HEADER
         // =====================================================
 
-        worksheet.Cell(1, 1).Value = "Kind";
-        worksheet.Cell(1, 2).Value = "Alter";
-        worksheet.Cell(1, 3).Value = "Klasse";
-        worksheet.Cell(1, 4).Value = "Status";
-        worksheet.Cell(1, 5).Value = "Allergien";
-        worksheet.Cell(1, 6).Value = "Notfallkontakt";
-        worksheet.Cell(1, 7).Value = "Telefonnummer";
-        worksheet.Cell(1, 8).Value = "Beziehungsstatus";
-        worksheet.Cell(1, 9).Value = "Besonderes";
-        worksheet.Cell(1, 10).Value = "Ort";
+        worksheet.Cell(1, 1).Value = $"Bestätigt: {GetCount(ev.Id, EnrollmentStatus.Confirmed)}";
+        worksheet.Cell(2, 1).Value = $"Warteliste: {GetCount(ev.Id, EnrollmentStatus.WaitingList)}";
+
+        worksheet.Cell(3, 1).Value = "Kind";
+        worksheet.Cell(3, 2).Value = "Alter";
+        worksheet.Cell(3, 3).Value = "Klasse";
+        worksheet.Cell(3, 4).Value = "Status";
+        worksheet.Cell(3, 5).Value = "Allergien";
+        worksheet.Cell(3, 6).Value = "Notfallkontakt";
+        worksheet.Cell(3, 7).Value = "Telefonnummer";
+        worksheet.Cell(3, 8).Value = "Beziehungsstatus";
+        worksheet.Cell(3, 9).Value = "Besonderes";
+        worksheet.Cell(3, 10).Value = "Ort";
 
 
-        int row = 2;
+        int row = 4;
 
 
         foreach (var entry in registrations)
@@ -1209,5 +1219,14 @@ else
             "downloadFileFromStream",
             fileName,
             streamRef);
+    }
+
+    int GetCount(int eventId, EnrollmentStatus status)
+    {
+        using var Db = DbFactory.CreateDbContext();
+
+        return Db.EventChildren.Count(x =>
+            x.EventId == eventId &&
+            x.Status == status);
     }
 }
