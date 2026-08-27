@@ -26,37 +26,43 @@ else
 {
     <div style="max-width:700px;">
 
-        <input placeholder="Name"
-               @bind="newChild.Name" />
+        <input class="form-control"
+               placeholder="Name (& Nachname wenn nicht derselbe wie im Account)"
+               @bind="newChild.Name"
+               @bind:event="oninput" />
 
-        <br /><br />
+        <br />
 
-        <p>
-            Alter:    
-            <input placeholder="Alter"
-                   type="number"
-                   @bind="newChild.Alter" />
-                   Jahre
-        </p>
+        <input class="form-control"
+               placeholder="Alter in Jahren"
+               @bind="newChild.Alter"
+               @bind:event="oninput" />
 
-        <select @bind="newChild.Klasse">
+        <br />
+
+        <select class="form-select" 
+            @bind="newChild.Klasse">
             @foreach (var k in Enum.GetValues<KlasseStufe>())
             {
                 <option value="@k">@GetKlasseText(k)</option>
             }
         </select>
 
-        <br /><br />
+        <br />
 
-        <input placeholder="Allergien"
-               @bind="newChild.Allergien" />
+        <input class="form-control"
+               placeholder="Allergien"
+               @bind="newChild.Allergien"
+               @bind:event="oninput" />
 
-        <br /><br />
+        <br />
 
-        <input placeholder="Besonderes"
-               @bind="newChild.Besonderes" />
+        <input class="form-control"
+               placeholder="Besonderes"
+               @bind="newChild.Besonderes"
+               @bind:event="oninput" />
 
-        <br /><br />
+        <br />
 
         <button class="btn btn-primary"
                 @onclick="AddChild"
@@ -66,7 +72,11 @@ else
 
         </button>
 
+        <br />
+
         <hr />
+
+        <br />
 
         @if (!myChildren.Any())
         {
