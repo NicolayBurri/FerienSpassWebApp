@@ -1,13 +1,13 @@
 ﻿@page "/kursleiter/events/{eventId:int}"
 
-
 @using FerienspassWebApp.Data
 @using FerienspassWebApp.Models
 @using Microsoft.EntityFrameworkCore
-@using ClosedXML.Excel;
-@using System.IO;
-@using Microsoft.AspNetCore.Components;
+@using ClosedXML.Excel
+@using System.IO
+@using Microsoft.AspNetCore.Components
 @using Microsoft.AspNetCore.Authorization
+@using Microsoft.JSInterop
 
 @attribute [Authorize(Roles = "Admin,Kursleiter")]
 
@@ -16,7 +16,7 @@
 
 <h1>Event Details</h1>
 
-<br/>
+<br />
 
 @if (ev == null)
 {
@@ -36,177 +36,546 @@ else
         @ev.EndeZeit?.ToString("dd.MM.yyyy HH:mm")
     </p>
 
-    <br/>
+    <br />
 
-    <h3> Verantstaltungsort</h3>
+    <h3>Veranstaltungsort</h3>
 
     <p>@ev.Location</p>
 
-    <br/>
+    <br />
 
     <h4>Kursleiter</h4>
 
-    @if (ev?.Kursleiter?.Any() == true)
+    @if (ev.Kursleiter?.Any() == true)
     {
         @foreach (var kl in ev.Kursleiter)
         {
             <p>
-                @kl.User?.Vorname @kl.User?.Nachname -> Telefonnummer: @kl.User?.Telefonnummer
-             </p>
+                @kl.User?.Vorname @kl.User?.Nachname
+                -> Telefonnummer: @kl.User?.Telefonnummer
+            </p>
         }
     }
     else
     {
-        <p style="color:red;">Es wurde noch kein Kursleiter bestimmt.</p>
+        <p style="color:red;">
+            Es wurde noch kein Kursleiter bestimmt.
+        </p>
     }
 
     <hr />
 
     <h4>Anmeldungen</h4>
 
-    @foreach (var entry in registrations)
+    @if (registrations.Any())
     {
-        <div style="border:1px solid #ddd; padding:10px; margin-bottom:8px;">
+        @foreach (var entry in registrations)
+        {
+            <div style="border:1px solid #ddd; padding:10px; margin-bottom:8px;">
 
-            <b>Kind:</b> @entry.Child.Name @entry.Child.ParentUser?.Nachname <br />
-            Alter: @entry.Child.Alter <br />
-            Klasse: @entry.Child.Klasse <br />
+                <b>Kind:</b>
+                @entry.Child.Name @entry.Child.ParentUser?.Nachname
+                <br />
 
-            <span style="color:@GetColor(entry.Status)">
-                @entry.Status
-            </span>
+                <span>Alter: @entry.Child.Alter</span>
+                <br />
 
-            <hr />
+                <span>Klasse: @entry.Child.Klasse</span>
+                <br />
 
-            <b>Notfallkontakte (Eltern):</b>
+                <span style="color:@GetColor(entry.Status)">
+                    @GetStatusText(entry.Status)
+                </span>
 
-            @if (contactsByParent.TryGetValue(entry.Child.ParentUserId, out var contacts))
-            {
-                @foreach (var c in contacts)
+                <hr />
+
+                <b>Notfallkontakte (Eltern):</b>
+
+                @if (contactsByParent.TryGetValue(
+                    entry.Child.ParentUserId,
+                    out var contacts))
                 {
-                    <div style="margin-left:10px;">
-                        @c.Name - @c.Telefon (@c.Beziehung)
+                    @foreach (var c in contacts)
+                    {
+                        <div style="margin-left:10px;">
+                            @c.Name - @c.Telefon (@c.Beziehung)
+                        </div>
+                    }
+                }
+                else
+                {
+                    <div style="margin-left:10px; color:gray;">
+                        Keine Kontakte vorhanden
                     </div>
                 }
-            }
-            else
-            {
-                <div style="margin-left:10px; color:gray;">
-                    Keine Kontakte vorhanden
-                </div>
-            }
-
-        </div>
+            </div>
+        }
+    }
+    else
+    {
+        <p>Für diesen Event sind noch keine Kinder angemeldet.</p>
     }
 
     <hr />
+
+    @* =========================================================
+       FAHRER
+       ========================================================= *@
 
     <h4>Fahrer</h4>
-    @if (ev?.BrauchtFahrer == true)
+
+    @if (ev.BrauchtFahrer)
     {
-        <p> Benötigt: @ev.AnzahlSitzplaetze |
-            Vorhanden: @driverCount |
-            Fehlen: @missingDrivers
+        <p>
+            Benötigte Sitzplätze: <b>@requiredSeats</b> |
+            Vorhandene Sitzplätze: <b>@availableSeats</b> |
+            Fehlende Sitzplätze:
+            <b style="color:@(missingSeats > 0 ? "red" : "green")">
+                @missingSeats
+            </b>
         </p>
+
         @if (roles.Any(x => x.Role == RoleType.Driver))
         {
+            <h5>Vorhandene Fahrer</h5>
+
             @foreach (var driver in roles.Where(x => x.Role == RoleType.Driver))
             {
-                <p>
-                    @driver.User.Vorname @driver.User.Nachname - @driver.Seats Sitzplätze -> Telefonnummer: @driver.User?.Telefonnummer
-                </p>
+                <div style="
+                    border:1px solid #ddd;
+                    padding:10px;
+                    margin-bottom:8px;
+                    border-radius:5px;">
+
+                    <b>
+                        @driver.User?.Vorname
+                        @driver.User?.Nachname
+                    </b>
+                    <br />
+
+                    Sitzplätze: @(driver.Seats ?? 0)
+                    <br />
+
+                    Telefonnummer:
+                    @(driver.User?.Telefonnummer ?? "-")
+                    <br />
+
+                    E-Mail:
+                    @(driver.User?.Email ?? "-")
+                    <br />
+
+                    Ort:
+                    @(driver.User?.Ort ?? "-")
+                </div>
             }
         }
         else
         {
-            <p>Es hat sich noch kein Fahrer angemeldet</p>
+            <p>Es hat sich noch kein Fahrer angemeldet.</p>
         }
+
+        <div style="
+            margin-top:20px;
+            border-top:1px solid #ddd;
+            padding-top:15px;">
+
+            <h5>Fahrer manuell hinzufügen</h5>
+
+            <div style="
+                display:flex;
+                gap:8px;
+                margin-bottom:10px;
+                flex-wrap:wrap;">
+
+                <input class="form-control"
+                       style="max-width:350px;"
+                       placeholder="Vorname, Nachname oder Wohnort"
+                       @bind="driverSearch"
+                       @bind:event="oninput" />
+
+                <button class="btn btn-primary"
+                        @onclick="SearchDrivers">
+                    Suchen
+                </button>
+            </div>
+
+            @if (driverSearchPerformed &&
+                 !driverSearchResults.Any())
+            {
+                <p style="color:gray;">
+                    Keine Benutzer gefunden.
+                </p>
+            }
+
+            @foreach (var user in driverSearchResults)
+            {
+                <div style="
+                    border:1px solid #ccc;
+                    padding:10px;
+                    margin-bottom:8px;
+                    border-radius:5px;">
+
+                    <b>@user.Vorname @user.Nachname</b>
+                    <br />
+
+                    <span>
+                        Ort: @(user.Ort ?? "-")
+                    </span>
+                    <br />
+
+                    <span>
+                        E-Mail: @(user.Email ?? "-")
+                    </span>
+                    <br />
+
+                    <span>
+                        Telefon: @(user.Telefonnummer ?? "-")
+                    </span>
+
+                    <br />
+                    <br />
+
+                    <label>
+                        Sitzplätze:
+                    </label>
+
+                    <input type="number"
+                           min="1"
+                           style="width:80px; margin-left:5px;"
+                           @bind="user.Seats" />
+
+                    <button class="btn btn-success"
+                            style="margin-left:10px;"
+                            @onclick="() => AddDriver(user)">
+                        Als Fahrer hinzufügen
+                    </button>
+                </div>
+            }
+        </div>
     }
     else
     {
-        <p>Es werden für diesen Event keine Fahrer benötigt</p>
+        <p>
+            Es werden für diesen Event keine Fahrer benötigt.
+        </p>
     }
 
     <hr />
 
+    @* =========================================================
+       BETREUUNGSPERSONEN
+       ========================================================= *@
+
     <h4>Betreuungspersonen</h4>
-    @if (ev?.BrauchtBetreuung == true)
+
+    @if (ev.BrauchtBetreuung)
     {
         <p>
-            Benötigt: @ev.AnzahlBetreuung |
-            Vorhanden: @HelperCount |
-            Fehlen: @missingHelper
+            Benötigt: <b>@requiredHelper</b> |
+            Vorhanden: <b>@HelperCount</b> |
+            Fehlen:
+            <b style="color:@(missingHelper > 0 ? "red" : "green")">
+                @missingHelper
+            </b>
         </p>
-    
+
         @if (roles.Any(x => x.Role == RoleType.Helper))
         {
-            @foreach (var helpernow in roles.Where(x => x.Role == RoleType.Helper))
+            <h5>Vorhandene Betreuungspersonen</h5>
+
+            @foreach (var helper in roles.Where(x => x.Role == RoleType.Helper))
             {
-                <p>
-                    @helpernow.User?.Vorname @helpernow.User?.Nachname -> Telefonnummer: @helpernow.User?.Telefonnummer
-                </p>
+                <div style="
+                    border:1px solid #ddd;
+                    padding:10px;
+                    margin-bottom:8px;
+                    border-radius:5px;">
+
+                    <b>
+                        @(helper.User?.Vorname)
+                        @(helper.User?.Nachname)
+                    </b>
+                    <br />
+
+                    Telefonnummer:
+                    @(helper.User?.Telefonnummer ?? "-")
+                    <br />
+
+                    E-Mail:
+                    @(helper.User?.Email ?? "-")
+                    <br />
+
+                    Ort:
+                    @(helper.User?.Ort ?? "-")
+                </div>
             }
         }
         else
         {
-            <p>Es hat sich noch niemand als Helfer eingetragen.</p>
+            <p>
+                Es hat sich noch niemand als Betreuungsperson eingetragen.
+            </p>
         }
+
+        <div style="
+            margin-top:20px;
+            border-top:1px solid #ddd;
+            padding-top:15px;">
+
+            <h5>Betreuungsperson manuell hinzufügen</h5>
+
+            <div style="
+                display:flex;
+                gap:8px;
+                margin-bottom:10px;
+                flex-wrap:wrap;">
+
+                <input class="form-control"
+                       style="max-width:350px;"
+                       placeholder="Vorname, Nachname oder Wohnort"
+                       @bind="helperSearch"
+                       @bind:event="oninput" />
+
+                <button class="btn btn-primary"
+                        @onclick="SearchHelpers">
+                    Suchen
+                </button>
+            </div>
+
+            @if (helperSearchPerformed &&
+                 !helperSearchResults.Any())
+            {
+                <p style="color:gray;">
+                    Keine Benutzer gefunden.
+                </p>
+            }
+
+            @foreach (var user in helperSearchResults)
+            {
+                <div style="
+                    border:1px solid #ccc;
+                    padding:10px;
+                    margin-bottom:8px;
+                    border-radius:5px;">
+
+                    <b>@user.Vorname @user.Nachname</b>
+                    <br />
+
+                    <span>
+                        Ort: @(user.Ort ?? "-")
+                    </span>
+                    <br />
+
+                    <span>
+                        E-Mail: @(user.Email ?? "-")
+                    </span>
+                    <br />
+
+                    <span>
+                        Telefon: @(user.Telefonnummer ?? "-")
+                    </span>
+
+                    <br />
+                    <br />
+
+                    <button class="btn btn-success"
+                            @onclick="() => AddHelper(user)">
+                        Als Betreuungsperson hinzufügen
+                    </button>
+                </div>
+            }
+        </div>
     }
     else
     {
-        <p>Es werden für diesen Event keine Helfer benötigt</p>
+        <p>
+            Es werden für diesen Event keine Betreuungspersonen benötigt.
+        </p>
     }
 
-    <button @onclick="ExportExcel">
+    @* =========================================================
+       MAIL BEI FEHLENDEN FAHRERN / HELFERN
+       ========================================================= *@
+
+    @if (missingSeats > 0 || missingHelper > 0)
+    {
+        <hr />
+
+        <h4>Fahrer / Betreuungspersonen suchen</h4>
+
+        <p style="color:darkred;">
+            Für diesen Event werden noch Personen benötigt.
+        </p>
+
+        @if (missingSeats > 0)
+        {
+            <p>
+                Es fehlen noch
+                <b>@missingSeats Sitzplätze</b>.
+            </p>
+        }
+
+        @if (missingHelper > 0)
+        {
+            <p>
+                Es fehlen noch
+                <b>@missingHelper Betreuungspersonen</b>.
+            </p>
+        }
+
+        <button class="btn btn-warning"
+                @onclick="OpenRecruitmentMail">
+            Eltern per E-Mail anfragen
+        </button>
+    }
+
+    <hr />
+
+    <button class="btn btn-secondary"
+            @onclick="ExportExcel">
         Excel exportieren
     </button>
 }
 
+
 @code {
 
-    [Parameter] public int eventId { get; set; }
+    [Parameter]
+    public int eventId { get; set; }
 
-    int driverCount => roles.Count(x => x.Role == RoleType.Driver);
-    int requiredDrivers => ev?.AnzahlSitzplaetze ?? 0;
-    int missingDrivers => Math.Max(requiredDrivers - driverCount, 0);
 
-    int HelperCount => roles.Count(x => x.Role == RoleType.Helper);
-    int requiredHelper => ev?.AnzahlBetreuung ?? 0;
-    int missingHelper => Math.Max(requiredHelper - HelperCount, 0);
+    // =========================================================
+    // FAHRER / SITZPLÄTZE
+    // =========================================================
+
+    int availableSeats =>
+        roles
+            .Where(x => x.Role == RoleType.Driver)
+            .Sum(x => x.Seats ?? 0);
+
+    int requiredSeats =>
+        ev?.AnzahlSitzplaetze ?? 0;
+
+    int missingSeats =>
+        ev?.BrauchtFahrer == true
+            ? Math.Max(requiredSeats - availableSeats, 0)
+            : 0;
+
+
+    // =========================================================
+    // BETREUUNG
+    // =========================================================
+
+    int HelperCount =>
+        roles.Count(x => x.Role == RoleType.Helper);
+
+    int requiredHelper =>
+        ev?.AnzahlBetreuung ?? 0;
+
+    int missingHelper =>
+        ev?.BrauchtBetreuung == true
+            ? Math.Max(requiredHelper - HelperCount, 0)
+            : 0;
+
+
+    // =========================================================
+    // SUCHEN
+    // =========================================================
+
+    private string driverSearch = "";
+    private bool driverSearchPerformed = false;
+
+    private List<UserSearchResult> driverSearchResults = new();
+
+
+    private string helperSearch = "";
+    private bool helperSearchPerformed = false;
+
+    private List<UserSearchResult> helperSearchResults = new();
+
+
+    // =========================================================
+    // DATEN
+    // =========================================================
 
     private Event? ev;
+
     private List<EventRoleAssignment> roles = new();
 
     private List<EventChild> registrations = new();
 
-    private Dictionary<string, List<EmergencyContact>> contactsByParent = new();
+    private Dictionary<string, List<EmergencyContact>>
+        contactsByParent = new();
+
+
+    // =========================================================
+    // USER SEARCH DTO
+    // =========================================================
+
+    private class UserSearchResult
+    {
+        public string Id { get; set; } = "";
+
+        public string? Vorname { get; set; }
+
+        public string? Nachname { get; set; }
+
+        public string? Ort { get; set; }
+
+        public string? Email { get; set; }
+
+        public string? Telefonnummer { get; set; }
+
+        public int Seats { get; set; } = 1;
+    }
+
+
+    // =========================================================
+    // EVENT LADEN
+    // =========================================================
 
     protected override async Task OnParametersSetAsync()
     {
-        await using var Db = await DbFactory.CreateDbContextAsync();
+        await LoadEventData();
+    }
+
+
+    private async Task LoadEventData()
+    {
+        await using var Db =
+            await DbFactory.CreateDbContextAsync();
+
         ev = await Db.Events
-            .Include(x=> x.Kursleiter)
-            .ThenInclude(x =>x.User)
+            .Include(x => x.Kursleiter)
+                .ThenInclude(x => x.User)
             .FirstOrDefaultAsync(x => x.Id == eventId);
 
         registrations = await Db.EventChildren
             .Include(x => x.Child)
                 .ThenInclude(c => c.ParentUser)
             .Where(x => x.EventId == eventId)
+            .OrderBy(x => x.RegisteredAt)
             .ToListAsync();
+
 
         var parentIds = registrations
             .Select(x => x.Child.ParentUserId)
             .Distinct()
             .ToList();
 
+
         var contacts = await Db.EmergencyContacts
-            .Where(x => parentIds.Contains(x.ApplicationUserId))
+            .Where(x =>
+                parentIds.Contains(x.ApplicationUserId))
             .ToListAsync();
+
 
         contactsByParent = contacts
             .GroupBy(x => x.ApplicationUserId)
-            .ToDictionary(g => g.Key, g => g.ToList());
+            .ToDictionary(
+                g => g.Key,
+                g => g.ToList());
+
 
         roles = await Db.EventRoleAssignments
             .Include(x => x.User)
@@ -214,19 +583,328 @@ else
             .ToListAsync();
     }
 
-    string GetColor(EnrollmentStatus status)
-        => status == EnrollmentStatus.Confirmed ? "green" : "orange";
 
+    // =========================================================
+    // STATUS
+    // =========================================================
+
+    string GetColor(EnrollmentStatus status)
+        => status == EnrollmentStatus.Confirmed
+            ? "green"
+            : "orange";
+
+
+    string GetStatusText(EnrollmentStatus status)
+        => status switch
+        {
+            EnrollmentStatus.Confirmed => "Bestätigt",
+            EnrollmentStatus.WaitingList => "Warteliste",
+            _ => status.ToString()
+        };
+
+
+    // =========================================================
+    // BENUTZER SUCHEN
+    // =========================================================
+
+    private async Task<List<UserSearchResult>>
+        SearchUsersInternal(string search)
+    {
+        if (string.IsNullOrWhiteSpace(search))
+            return new List<UserSearchResult>();
+
+        search = search.Trim();
+
+        await using var Db =
+            await DbFactory.CreateDbContextAsync();
+
+        return await Db.Users
+            .AsNoTracking()
+            .Where(x =>
+                (x.Vorname != null &&
+                 x.Vorname.Contains(search)) ||
+
+                (x.Nachname != null &&
+                 x.Nachname.Contains(search)) ||
+
+                (x.Ort != null &&
+                 x.Ort.Contains(search)))
+            .OrderBy(x => x.Nachname)
+            .ThenBy(x => x.Vorname)
+            .Take(30)
+            .Select(x => new UserSearchResult
+            {
+                Id = x.Id,
+                Vorname = x.Vorname,
+                Nachname = x.Nachname,
+                Ort = x.Ort,
+                Email = x.Email,
+                Telefonnummer = x.Telefonnummer,
+                Seats = 1
+            })
+            .ToListAsync();
+    }
+
+
+    async Task SearchDrivers()
+    {
+        driverSearchPerformed = true;
+
+        driverSearchResults =
+            await SearchUsersInternal(driverSearch);
+    }
+
+
+    async Task SearchHelpers()
+    {
+        helperSearchPerformed = true;
+
+        helperSearchResults =
+            await SearchUsersInternal(helperSearch);
+    }
+
+
+    // =========================================================
+    // FAHRER HINZUFÜGEN
+    // =========================================================
+
+    async Task AddDriver(UserSearchResult user)
+    {
+        if (user.Seats < 1)
+            user.Seats = 1;
+
+        await using var Db =
+            await DbFactory.CreateDbContextAsync();
+
+
+        var alreadyAssigned =
+            await Db.EventRoleAssignments
+                .AnyAsync(x =>
+                    x.EventId == eventId &&
+                    x.UserId == user.Id &&
+                    x.Role == RoleType.Driver);
+
+
+        if (alreadyAssigned)
+        {
+            driverSearchResults.Remove(user);
+            return;
+        }
+
+
+        var assignment = new EventRoleAssignment
+        {
+            EventId = eventId,
+            UserId = user.Id,
+            Role = RoleType.Driver,
+            Seats = user.Seats
+        };
+
+
+        Db.EventRoleAssignments.Add(assignment);
+
+        await Db.SaveChangesAsync();
+
+
+        roles = await Db.EventRoleAssignments
+            .Include(x => x.User)
+            .Where(x => x.EventId == eventId)
+            .ToListAsync();
+
+
+        driverSearchResults.Remove(user);
+
+        StateHasChanged();
+    }
+
+
+    // =========================================================
+    // BETREUUNGSPERSON HINZUFÜGEN
+    // =========================================================
+
+    async Task AddHelper(UserSearchResult user)
+    {
+        await using var Db =
+            await DbFactory.CreateDbContextAsync();
+
+
+        var alreadyAssigned =
+            await Db.EventRoleAssignments
+                .AnyAsync(x =>
+                    x.EventId == eventId &&
+                    x.UserId == user.Id &&
+                    x.Role == RoleType.Helper);
+
+
+        if (alreadyAssigned)
+        {
+            helperSearchResults.Remove(user);
+            return;
+        }
+
+
+        var assignment = new EventRoleAssignment
+        {
+            EventId = eventId,
+            UserId = user.Id,
+            Role = RoleType.Helper
+        };
+
+
+        Db.EventRoleAssignments.Add(assignment);
+
+        await Db.SaveChangesAsync();
+
+
+        roles = await Db.EventRoleAssignments
+            .Include(x => x.User)
+            .Where(x => x.EventId == eventId)
+            .ToListAsync();
+
+
+        helperSearchResults.Remove(user);
+
+        StateHasChanged();
+    }
+
+
+    // =========================================================
+    // MAIL AN ELTERN
+    // =========================================================
+
+    async Task OpenRecruitmentMail()
+    {
+        if (ev == null)
+            return;
+
+
+        await using var Db =
+            await DbFactory.CreateDbContextAsync();
+
+
+        var recipients = await Db.EventChildren
+            .Where(x =>
+                x.EventId == eventId &&
+                x.Status == EnrollmentStatus.Confirmed)
+            .Select(x => x.Child.ParentUser.Email)
+            .Where(x =>
+                x != null &&
+                x != "")
+            .Distinct()
+            .ToListAsync();
+
+
+        if (!recipients.Any())
+            return;
+
+
+        var missingText = new List<string>();
+
+
+        if (missingSeats > 0)
+        {
+            missingText.Add(
+                $"Für den Transport fehlen uns aktuell noch " +
+                $"Fahrer. " +
+                "Falls Sie als Fahrer oder Fahrerin mithelfen können, " +
+                "teilen Sie uns bitte auch mit, wie viele Sitzplätze " +
+                "Sie zur Verfügung stellen können.");
+        }
+
+
+        if (missingHelper > 0)
+        {
+            missingText.Add(
+                $"Zusätzlich suchen wir noch " +
+                $"helfende Betreuungsperson.");
+        }
+
+
+        var kursleiterNames =
+            ev.Kursleiter?
+                .Where(x => x.User != null)
+                .Select(x =>
+                    $"{x.User!.Vorname} {x.User.Nachname}".Trim())
+                .Where(x =>
+                    !string.IsNullOrWhiteSpace(x))
+                .ToList()
+            ?? new List<string>();
+
+
+        var kursleiterText =
+            kursleiterNames.Any()
+                ? string.Join(", ", kursleiterNames)
+                : "Ferienspass-Team";
+
+
+        var subject =
+            $"Unterstützung gesucht für {ev.Eventname}";
+
+
+        var body =
+            $"Liebe Eltern und Erziehungsberechtigte,\n\n" +
+
+            $"für den Anlass \"{ev.Eventname}\" " +
+
+            $"am {ev.StartZeit?.ToString("dd.MM.yyyy")} " +
+
+            "benötigen wir noch Unterstützung.\n\n" +
+
+            string.Join("\n\n", missingText) +
+
+            "\n\n" +
+
+            "Falls Sie uns unterstützen können, " +
+            "melden Sie sich bitte bei uns.\n\n" +
+
+            "Vielen Dank für Ihre Mithilfe.\n\n" +
+
+            "Freundliche Grüsse\n" +
+
+            kursleiterText;
+
+
+        var recipientString =
+            string.Join(",", recipients);
+
+
+        var mailto =
+            "mailto:" +
+            $"?bcc={Uri.EscapeDataString(recipientString)}" +
+            $"&subject={Uri.EscapeDataString(subject)}" +
+            $"&body={Uri.EscapeDataString(body)}";
+
+
+        await JS.InvokeVoidAsync(
+            "open",
+            mailto,
+            "_self");
+    }
+
+
+    // =========================================================
+    // EXCEL EXPORT
+    // =========================================================
 
     async Task ExportExcel()
     {
-        await using var Db = await DbFactory.CreateDbContextAsync();
-        if (ev == null) return;
+        await using var Db =
+            await DbFactory.CreateDbContextAsync();
+
+        if (ev == null)
+            return;
+
 
         using var workbook = new XLWorkbook();
-        var worksheet = workbook.Worksheets.Add("Teilnehmer");
 
-        // Header
+        var worksheet =
+            workbook.Worksheets.Add("Teilnehmer");
+
+
+        // =====================================================
+        // TEILNEHMER HEADER
+        // =====================================================
+
         worksheet.Cell(1, 1).Value = "Kind";
         worksheet.Cell(1, 2).Value = "Alter";
         worksheet.Cell(1, 3).Value = "Klasse";
@@ -238,157 +916,298 @@ else
         worksheet.Cell(1, 9).Value = "Besonderes";
         worksheet.Cell(1, 10).Value = "Ort";
 
+
         int row = 2;
+
 
         foreach (var entry in registrations)
         {
             var contacts = Db.EmergencyContacts
-            .Where(x => x.ApplicationUserId == entry.Child.ParentUserId)
-            .Select(x => new
-            {
-                Name = x.Name,
-                Telefon = x.Telefon ?? "-",
-                Beziehung = x.Beziehung ?? "-"
-            })
-            .Take(1)
-            .ToList();
+                .Where(x =>
+                    x.ApplicationUserId ==
+                    entry.Child.ParentUserId)
+                .Select(x => new
+                {
+                    Name = x.Name,
+                    Telefon = x.Telefon ?? "-",
+                    Beziehung = x.Beziehung ?? "-"
+                })
+                .Take(1)
+                .ToList();
+
 
             if (!contacts.Any())
             {
                 var parentContact = Db.Users
-                    .Where(x => x.Id == entry.Child.ParentUserId)
+                    .Where(x =>
+                        x.Id ==
+                        entry.Child.ParentUserId)
                     .Select(x => new
                     {
-                        Name = ((x.Vorname ?? "") + " " + (x.Nachname ?? "")).Trim(),
-                        Telefon = x.Telefonnummer ?? "-",
-                        Beziehung = "Kontoinhaber"
+                        Name =
+                            ((x.Vorname ?? "") +
+                             " " +
+                             (x.Nachname ?? ""))
+                            .Trim(),
+
+                        Telefon =
+                            x.Telefonnummer ?? "-",
+
+                        Beziehung =
+                            "Kontoinhaber"
                     })
                     .FirstOrDefault();
+
 
                 if (parentContact != null)
                 {
                     contacts.Add(parentContact);
                 }
-
             }
 
-            worksheet.Cell(row, 1).Value = $"{entry.Child.Name} {entry.Child.ParentUser?.Nachname}".Trim();
-            worksheet.Cell(row, 2).Value = entry.Child.Alter;
+
+            worksheet.Cell(row, 1).Value =
+                $"{entry.Child.Name} " +
+                $"{entry.Child.ParentUser?.Nachname}"
+                .Trim();
+
+
+            worksheet.Cell(row, 2).Value =
+                entry.Child.Alter;
+
+
             worksheet.Cell(row, 3).Value =
-                                            entry.Child.Klasse switch
-                                            {
-                                                KlasseStufe.KiGa1 => "1. Kindergarten",
-                                                KlasseStufe.KiGa2 => "2. Kindergarten",
-                                                KlasseStufe.Klasse1 => "1. Klasse",
-                                                KlasseStufe.Klasse2 => "2. Klasse",
-                                                KlasseStufe.Klasse3 => "3. Klasse",
-                                                KlasseStufe.Klasse4 => "4. Klasse",
-                                                KlasseStufe.Klasse5 => "5. Klasse",
-                                                KlasseStufe.Klasse6 => "6. Klasse",
-                                                KlasseStufe.Klasse7 => "7. Klasse",
-                                                KlasseStufe.Klasse8 => "8. Klasse",
-                                                KlasseStufe.Klasse9 => "9. Klasse",
-                                                _ => ""
-                                            };
-            worksheet.Cell(row, 4).Value = entry.Status.ToString();
-            worksheet.Cell(row, 5).Value = entry.Child.Allergien;
-            worksheet.Cell(row, 6).Value = contacts.ElementAtOrDefault(0)?.Name;
-            worksheet.Cell(row, 7).Value = contacts.ElementAtOrDefault(0)?.Telefon;
-            worksheet.Cell(row, 8).Value = contacts.ElementAtOrDefault(0)?.Beziehung;
-            worksheet.Cell(row, 9).Value = entry.Child.Besonderes;
-            worksheet.Cell(row, 10).Value = entry.Child.ParentUser?.Ort;
+                entry.Child.Klasse switch
+                {
+                    KlasseStufe.KiGa1 =>
+                        "1. Kindergarten",
+
+                    KlasseStufe.KiGa2 =>
+                        "2. Kindergarten",
+
+                    KlasseStufe.Klasse1 =>
+                        "1. Klasse",
+
+                    KlasseStufe.Klasse2 =>
+                        "2. Klasse",
+
+                    KlasseStufe.Klasse3 =>
+                        "3. Klasse",
+
+                    KlasseStufe.Klasse4 =>
+                        "4. Klasse",
+
+                    KlasseStufe.Klasse5 =>
+                        "5. Klasse",
+
+                    KlasseStufe.Klasse6 =>
+                        "6. Klasse",
+
+                    KlasseStufe.Klasse7 =>
+                        "7. Klasse",
+
+                    KlasseStufe.Klasse8 =>
+                        "8. Klasse",
+
+                    KlasseStufe.Klasse9 =>
+                        "9. Klasse",
+
+                    _ => ""
+                };
+
+
+            worksheet.Cell(row, 4).Value =
+                GetStatusText(entry.Status);
+
+            worksheet.Cell(row, 5).Value =
+                entry.Child.Allergien;
+
+            worksheet.Cell(row, 6).Value =
+                contacts.ElementAtOrDefault(0)?.Name;
+
+            worksheet.Cell(row, 7).Value =
+                contacts.ElementAtOrDefault(0)?.Telefon;
+
+            worksheet.Cell(row, 8).Value =
+                contacts.ElementAtOrDefault(0)?.Beziehung;
+
+            worksheet.Cell(row, 9).Value =
+                entry.Child.Besonderes;
+
+            worksheet.Cell(row, 10).Value =
+                entry.Child.ParentUser?.Ort;
+
 
             row++;
         }
 
-        var drivers = Db.EventRoleAssignments
-            .Include(x => x.User)
-            .Where(x => x.EventId == eventId && x.Role == RoleType.Driver)
-            .ToList();
 
-        var wsDrivers = workbook.Worksheets.Add("Fahrer");
+        // =====================================================
+        // FAHRER
+        // =====================================================
+
+        var drivers = await Db.EventRoleAssignments
+            .Include(x => x.User)
+            .Where(x =>
+                x.EventId == eventId &&
+                x.Role == RoleType.Driver)
+            .ToListAsync();
+
+
+        var wsDrivers =
+            workbook.Worksheets.Add("Fahrer");
+
+
+        wsDrivers.Cell(1, 1).Value = "User";
+        wsDrivers.Cell(1, 2).Value = "Telefonnummer";
+        wsDrivers.Cell(1, 3).Value = "Sitzplätze";
+        wsDrivers.Cell(1, 4).Value = "Ort";
+        wsDrivers.Cell(1, 5).Value = "E-Mail";
+
 
         if (ev.BrauchtFahrer)
         {
+            wsDrivers.Cell(1, 6).Value =
+                $"Fehlende Sitzplätze: {missingSeats}";
 
-            wsDrivers.Cell(1, 1).Value = "User";
-            wsDrivers.Cell(1, 2).Value = "Telefonnummer";
-            wsDrivers.Cell(1, 3).Value = "Sitzplätze";
-            wsDrivers.Cell(1, 4).Value = "Ort";
 
             int r = 2;
 
-            if(drivers.Any())
+
+            if (drivers.Any())
             {
-                wsDrivers.Cell(1, 5).Value = $"Es fehlen noch: {missingDrivers} Fahrer"; 
                 foreach (var d in drivers)
                 {
-                    wsDrivers.Cell(r, 1).Value = $"{d.User?.UserName} {d.User?.Nachname}";
-                    wsDrivers.Cell(r, 2).Value = d.User?.Telefonnummer;
-                    wsDrivers.Cell(r, 3).Value = d.Seats ?? 0;
-                    wsDrivers.Cell(r, 4).Value = d.User?.Ort;
+                    wsDrivers.Cell(r, 1).Value =
+                        $"{d.User?.Vorname} " +
+                        $"{d.User?.Nachname}"
+                        .Trim();
+
+                    wsDrivers.Cell(r, 2).Value =
+                        d.User?.Telefonnummer;
+
+                    wsDrivers.Cell(r, 3).Value =
+                        d.Seats ?? 0;
+
+                    wsDrivers.Cell(r, 4).Value =
+                        d.User?.Ort;
+
+                    wsDrivers.Cell(r, 5).Value =
+                        d.User?.Email;
+
                     r++;
                 }
             }
             else
             {
-                wsDrivers.Cell(r, 1).Value = "Es hat sich noch kein Fahrer angemeldet.";
+                wsDrivers.Cell(2, 1).Value =
+                    "Es hat sich noch kein Fahrer angemeldet.";
             }
         }
         else
         {
-            wsDrivers.Cell(2, 1).Value = "Es werden für diesen Event keine Fahrer benötigt.";
+            wsDrivers.Cell(2, 1).Value =
+                "Es werden für diesen Event keine Fahrer benötigt.";
         }
 
-        var helpers = Db.EventRoleAssignments
-            .Include(x => x.User)
-            .Where(x => x.EventId == eventId && x.Role == RoleType.Helper)
-            .ToList();
 
-        var wsHelpers = workbook.Worksheets.Add("Betreuung");
+        // =====================================================
+        // BETREUUNG
+        // =====================================================
+
+        var helpers = await Db.EventRoleAssignments
+            .Include(x => x.User)
+            .Where(x =>
+                x.EventId == eventId &&
+                x.Role == RoleType.Helper)
+            .ToListAsync();
+
+
+        var wsHelpers =
+            workbook.Worksheets.Add("Betreuung");
+
+
+        wsHelpers.Cell(1, 1).Value = "User";
+        wsHelpers.Cell(1, 2).Value = "Telefonnummer";
+        wsHelpers.Cell(1, 3).Value = "Ort";
+        wsHelpers.Cell(1, 4).Value = "E-Mail";
+
 
         if (ev.BrauchtBetreuung)
         {
-            wsHelpers.Cell(1, 5).Value = $"Es fehlen noch: {missingHelper} Betreuungspersonen / Helfer";
-            wsHelpers.Cell(1, 1).Value = "User";
-            wsHelpers.Cell(1, 2).Value = "Telefonnummer";
-            wsHelpers.Cell(1, 3).Value = "Ort";
+            wsHelpers.Cell(1, 5).Value =
+                $"Fehlende Betreuungspersonen: {missingHelper}";
+
 
             int r2 = 2;
 
+
             if (helpers.Any())
             {
-
                 foreach (var h in helpers)
                 {
-                    wsHelpers.Cell(r2, 1).Value = $"{h.User?.UserName} {h.User?.Nachname}";
-                    wsHelpers.Cell(r2, 2).Value = h.User?.Telefonnummer;
-                    wsHelpers.Cell(r2, 3).Value = h.User?.Ort;
+                    wsHelpers.Cell(r2, 1).Value =
+                        $"{h.User?.Vorname} " +
+                        $"{h.User?.Nachname}"
+                        .Trim();
+
+                    wsHelpers.Cell(r2, 2).Value =
+                        h.User?.Telefonnummer;
+
+                    wsHelpers.Cell(r2, 3).Value =
+                        h.User?.Ort;
+
+                    wsHelpers.Cell(r2, 4).Value =
+                        h.User?.Email;
+
                     r2++;
                 }
-
             }
             else
             {
-                wsHelpers.Cell(r2, 1).Value = "Es hat sich noch niemand als Helfer eingetragen.";
+                wsHelpers.Cell(2, 1).Value =
+                    "Es hat sich noch niemand als Betreuungsperson eingetragen.";
             }
         }
         else
         {
-            wsHelpers.Cell(2, 1).Value = "Es werden für diesen Event keine Helfer benötigt";
+            wsHelpers.Cell(2, 1).Value =
+                "Es werden für diesen Event keine Betreuungspersonen benötigt.";
         }
 
+
+        // =====================================================
+        // SPALTENBREITEN
+        // =====================================================
+
         worksheet.Columns().AdjustToContents();
+        wsDrivers.Columns().AdjustToContents();
+        wsHelpers.Columns().AdjustToContents();
+
+
+        // =====================================================
+        // DOWNLOAD
+        // =====================================================
 
         using var stream = new MemoryStream();
+
         workbook.SaveAs(stream);
 
         stream.Position = 0;
 
-        var fileName = $"Event_{ev.Eventname}_Teilnehmer.xlsx";
 
-        using var streamRef = new DotNetStreamReference(stream: stream);
+        var fileName =
+            $"Event_{ev.Eventname}_Teilnehmer.xlsx";
 
-        await JS.InvokeVoidAsync("downloadFileFromStream", fileName, streamRef);
+
+        using var streamRef =
+            new DotNetStreamReference(
+                stream: stream);
+
+
+        await JS.InvokeVoidAsync(
+            "downloadFileFromStream",
+            fileName,
+            streamRef);
     }
 }

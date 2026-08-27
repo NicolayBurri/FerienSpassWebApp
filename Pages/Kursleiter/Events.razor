@@ -21,7 +21,8 @@
         @ev.EndeZeit?.ToString("dd.MM.yyyy HH:mm")<br />
 
         <span>Ort: @ev.Location</span><br />
-        <span>Teilnehmer: @GetCount(ev.Id)</span><br />
+        <span>Bestätigt: @GetCount(ev.Id, EnrollmentStatus.Confirmed)</span><br />
+        <span>Warteliste: @GetCount(ev.Id, EnrollmentStatus.WaitingList)</span><br /><br />
 
         <button @onclick="() => GoDetails(ev.Id)">Details</button>
         <button @onclick="() => GoEdit(ev.Id)">Bearbeiten</button>
@@ -118,10 +119,13 @@
             currentPage--;
     }
 
-    int GetCount(int eventId)
+    int GetCount(int eventId, EnrollmentStatus status)
     {
         using var Db = DbFactory.CreateDbContext();
-        return Db.EventChildren.Count(x => x.EventId == eventId);
+
+        return Db.EventChildren.Count(x =>
+            x.EventId == eventId &&
+            x.Status == status);
     }
 
     void GoDetails(int id)
