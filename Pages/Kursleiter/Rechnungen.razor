@@ -13,6 +13,11 @@
 
 <h3>Rechnungsverwaltung</h3>
 
+
+@* =========================================================
+   REFERENZNUMMER ALS BEZAHLT MARKIEREN
+   ========================================================= *@
+
 <div style="margin-bottom:20px;">
 
     <input class="form-control"
@@ -30,9 +35,118 @@
 
 <hr />
 
-@if (!invoices.Any())
+
+@* =========================================================
+   FILTER
+   ========================================================= *@
+
+<div class="card mb-4">
+    <div class="card-body">
+
+        <h5 class="card-title mb-3">
+            Rechnungen filtern
+        </h5>
+
+        <div class="row g-3">
+
+            @* Familienname *@
+            <div class="col-md-4">
+
+                <label class="form-label">
+                    Familie
+                </label>
+
+                <input class="form-control"
+                       placeholder="Nach Familienname suchen..."
+                       @bind="FilterName"
+                       @bind:event="oninput" />
+
+            </div>
+
+
+            @* E-Mail *@
+            <div class="col-md-4">
+
+                <label class="form-label">
+                    E-Mail
+                </label>
+
+                <input class="form-control"
+                       placeholder="Nach E-Mail suchen..."
+                       @bind="FilterEmail"
+                       @bind:event="oninput" />
+
+            </div>
+
+
+            @* Status *@
+            <div class="col-md-4">
+
+                <label class="form-label">
+                    Status
+                </label>
+
+                <select class="form-select"
+                        @bind="FilterStatus">
+
+                    <option value="">
+                        Alle Status
+                    </option>
+
+                    <option value="Open">
+                        Offen
+                    </option>
+
+                    <option value="Reminder">
+                        Mahnung
+                    </option>
+
+                    <option value="Paid">
+                        Bezahlt
+                    </option>
+
+                    <option value="PartlyRefundet">
+                        Teilweise zurückerstattet
+                    </option>
+
+                    <option value="Refunded">
+                        Zurückerstattet
+                    </option>
+
+                </select>
+
+            </div>
+
+        </div>
+
+
+        @* Filter zurücksetzen *@
+        <div class="mt-3">
+
+            <button class="btn btn-outline-secondary"
+                    @onclick="ResetFilters">
+                Filter zurücksetzen
+            </button>
+
+            <span class="ms-3 text-muted">
+                @filteredInvoices.Count Rechnung(en) gefunden
+            </span>
+
+        </div>
+
+    </div>
+</div>
+
+
+@* =========================================================
+   RECHNUNGSTABELLE
+   ========================================================= *@
+
+@if (!filteredInvoices.Any())
 {
-    <p>Keine Rechnungen vorhanden.</p>
+    <div class="alert alert-info">
+        Keine Rechnungen mit diesen Filterkriterien gefunden.
+    </div>
 }
 else
 {
@@ -40,16 +154,23 @@ else
 
         <thead>
             <tr>
+
                 <th>Referenz</th>
+
                 <th>Familie</th>
+
                 <th>E-Mail</th>
+
                 <th>Datum</th>
+
                 <th>Total</th>
+
                 <th>Status</th>
 
                 <AuthorizeView Roles="Admin">
                     <th>Ändern</th>
                 </AuthorizeView>
+
             </tr>
         </thead>
 
@@ -62,40 +183,85 @@ else
                 .ToList();
 
                 <tr>
-                    <td>@invoice.Reference</td>
 
-                    <td>@invoice.ParentUser.Nachname</td>
-
-                    <td>@invoice.ParentUser.Email</td>
-
-                    <td>@invoice.CreatedAt.ToString("dd.MM.yyyy")</td>
-
-                    <td>CHF @invoice.TotalAmount</td>
-
+                    @* Referenz *@
                     <td>
-                        <span style="color:@GetColor(invoice.Status); font-weight:bold;">
-                            @GetText(invoice.Status)
-                        </span>
+                        @invoice.Reference
                     </td>
 
+
+                    @* Familie *@
+                    <td>
+                        @invoice.ParentUser?.Nachname
+                    </td>
+
+
+                    @* E-Mail *@
+                    <td>
+                        @invoice.ParentUser?.Email
+                    </td>
+
+
+                    @* Rechnungsdatum *@
+                    <td>
+                        @invoice.CreatedAt.ToString("dd.MM.yyyy")
+                    </td>
+
+
+                    @* Total *@
+                    <td>
+                        CHF @invoice.TotalAmount
+                    </td>
+
+
+                    @* Status *@
+                    <td>
+
+                        <span style="color:@GetColor(invoice.Status);
+                                     font-weight:bold;">
+
+                            @GetText(invoice.Status)
+
+                        </span>
+
+                    </td>
+
+
+                    @* Status ändern - nur Admin *@
                     <AuthorizeView Roles="Admin">
+
                         <td>
+
                             <select class="form-select"
                                     value="@invoice.Status"
-                                    @onchange="e => ChangeStatus(invoice, e.Value?.ToString())">
+                                    @onchange="e => ChangeStatus(
+                                        invoice,
+                                        e.Value?.ToString())">
 
-                                <option value="Open">Offen</option>
-                                <option value="Reminder">Mahnung</option>
-                                <option value="Paid">Bezahlt</option>
+                                <option value="Open">
+                                    Offen
+                                </option>
 
-                                @if (invoice.Status == InvoiceStatus.PartlyRefundet)
+                                <option value="Reminder">
+                                    Mahnung
+                                </option>
+
+                                <option value="Paid">
+                                    Bezahlt
+                                </option>
+
+
+                                @if (invoice.Status ==
+                               InvoiceStatus.PartlyRefundet)
                                 {
                                     <option value="PartlyRefundet">
                                         Teilweise zurückerstattet
                                     </option>
                                 }
 
-                                @if (invoice.Status == InvoiceStatus.Refunded)
+
+                                @if (invoice.Status ==
+                               InvoiceStatus.Refunded)
                                 {
                                     <option value="Refunded">
                                         Zurückerstattet
@@ -103,58 +269,89 @@ else
                                 }
 
                             </select>
+
                         </td>
+
                     </AuthorizeView>
+
                 </tr>
+
+
+                @* =================================================
+        OFFENE RÜCKERSTATTUNGEN
+        ================================================= *@
 
                 @if (refunds.Any())
                 {
                     <tr>
+
                         <td colspan="7"
-                            style="background:#fff3cd;
-                                   color:#842029;
-                                   font-weight:bold;">
+                            style="
+                                background:#fff3cd;
+                                color:#842029;
+                                font-weight:bold;
+                                        ">
 
                             <div style="margin-bottom:10px;">
                                 Rückerstattung erforderlich:
                             </div>
 
+
                             @foreach (var refund in refunds)
                             {
-                                <div style="display:flex;
-                                            align-items:center;
-                                            justify-content:space-between;
-                                            flex-wrap:wrap;
-                                            gap:10px;
-                                            padding:10px;
-                                            margin-bottom:8px;
-                                            background:white;
-                                            border:1px solid #e5c365;
-                                            border-radius:6px;">
+                                <div style="
+                                    display:flex;
+                                    align-items:center;
+                                    justify-content:space-between;
+                                    flex-wrap:wrap;
+                                    gap:10px;
+                                    padding:10px;
+                                    margin-bottom:8px;
+                                    background:white;
+                                    border:1px solid #e5c365;
+                                    border-radius:6px;
+                                                ">
 
                                     <span>
+
                                         @refund.ChildName –
+
                                         @refund.EventName –
+
                                         CHF @refund.Amount
+
                                     </span>
 
+
                                     <AuthorizeView Roles="Admin">
+
                                         <button class="btn btn-sm btn-success"
-                                                @onclick="() => ConfirmRefund(refund.Id)">
+                                                @onclick="() =>
+                                                    ConfirmRefund(refund.Id)">
+
                                             Rückerstattung bestätigen
+
                                         </button>
+
                                     </AuthorizeView>
 
                                 </div>
                             }
 
+
                             <AuthorizeView Roles="Kursleiter">
+
                                 <p style="margin:8px 0 0 0;">
-                                    Die Rückerstattung muss durch einen Administrator bestätigt werden.
+
+                                    Die Rückerstattung muss durch
+                                    einen Administrator bestätigt werden.
+
                                 </p>
+
                             </AuthorizeView>
 
                         </td>
+
                     </tr>
                 }
             }
@@ -163,17 +360,32 @@ else
 
     </table>
 
+
+    @* =========================================================
+       PAGINATION
+       ========================================================= *@
+
     @if (totalPages > 1)
     {
         <div class="mt-3"
-             style="display:flex; gap:8px; flex-wrap:wrap;">
+             style="
+                display:flex;
+                gap:8px;
+                flex-wrap:wrap;
+                align-items:center;
+                     ">
 
+            @* Zurück *@
             <button class="btn btn-secondary"
                     @onclick="PreviousPage"
                     disabled="@(currentPage == 1)">
+
                 ← Zurück
+
             </button>
 
+
+            @* Seitenzahlen *@
             @for (int i = 1; i <= totalPages; i++)
             {
                 var pageNumber = i;
@@ -182,73 +394,275 @@ else
                     ? "btn-primary"
                     : "btn-outline-primary")"
                         @onclick="() => GoToPage(pageNumber)">
+
                     @pageNumber
+
                 </button>
             }
 
+
+            @* Weiter *@
             <button class="btn btn-secondary"
                     @onclick="NextPage"
                     disabled="@(currentPage == totalPages)">
+
                 Weiter →
+
             </button>
 
         </div>
     }
 }
 
+
 @code {
+
+    // =========================================================
+    // DATEN
+    // =========================================================
+
     private List<Invoice> invoices = new();
+
     private List<RefundRequest> refundRequests = new();
+
+
+    // =========================================================
+    // REFERENZ-SUCHE
+    // =========================================================
 
     private string? searchReference;
 
+
+    // =========================================================
+    // FILTER
+    // =========================================================
+
+    private string _filterName = "";
+
+    private string _filterEmail = "";
+
+    private string _filterStatus = "";
+
+
+    private string FilterName
+    {
+        get => _filterName;
+
+        set
+        {
+            _filterName = value ?? "";
+
+            // Bei einer neuen Suche wieder auf Seite 1
+            currentPage = 1;
+        }
+    }
+
+
+    private string FilterEmail
+    {
+        get => _filterEmail;
+
+        set
+        {
+            _filterEmail = value ?? "";
+
+            currentPage = 1;
+        }
+    }
+
+
+    private string FilterStatus
+    {
+        get => _filterStatus;
+
+        set
+        {
+            _filterStatus = value ?? "";
+
+            currentPage = 1;
+        }
+    }
+
+
+    // =========================================================
+    // GEFILTERTE RECHNUNGEN
+    // =========================================================
+
+    private List<Invoice> filteredInvoices =>
+        invoices
+            .Where(invoice =>
+
+                // ---------------------------------------------
+                // Familienname
+                // ---------------------------------------------
+
+                (
+                    string.IsNullOrWhiteSpace(FilterName)
+
+                    ||
+
+                    (
+                        invoice.ParentUser?.Nachname?
+                            .Contains(
+                                FilterName.Trim(),
+                                StringComparison.OrdinalIgnoreCase
+                            )
+                        ?? false
+                    )
+                )
+
+
+                &&
+
+
+                // ---------------------------------------------
+                // E-Mail
+                // ---------------------------------------------
+
+                (
+                    string.IsNullOrWhiteSpace(FilterEmail)
+
+                    ||
+
+                    (
+                        invoice.ParentUser?.Email?
+                            .Contains(
+                                FilterEmail.Trim(),
+                                StringComparison.OrdinalIgnoreCase
+                            )
+                        ?? false
+                    )
+                )
+
+
+                &&
+
+
+                // ---------------------------------------------
+                // Status
+                // ---------------------------------------------
+
+                (
+                    string.IsNullOrWhiteSpace(FilterStatus)
+
+                    ||
+
+                    invoice.Status.ToString() == FilterStatus
+                )
+
+            )
+            .ToList();
+
+
+    // =========================================================
+    // PAGINATION
+    // =========================================================
+
     private int currentPage = 1;
+
     private const int pageSize = 10;
 
+
     private List<Invoice> pagedInvoices =>
-        invoices
+        filteredInvoices
             .Skip((currentPage - 1) * pageSize)
             .Take(pageSize)
             .ToList();
 
+
     private int totalPages =>
-        (int)Math.Ceiling(invoices.Count / (double)pageSize);
+        (int)Math.Ceiling(
+            filteredInvoices.Count / (double)pageSize
+        );
+
+
+    // =========================================================
+    // INITIALISIERUNG
+    // =========================================================
 
     protected override async Task OnInitializedAsync()
     {
         await LoadInvoices();
     }
 
+
+    // =========================================================
+    // RECHNUNGEN LADEN
+    // =========================================================
+
     private async Task LoadInvoices()
     {
         await using var Db =
             await DbFactory.CreateDbContextAsync();
 
+
         invoices = await Db.Invoices
+
             .AsNoTracking()
+
             .Include(x => x.ParentUser)
+
             .OrderByDescending(x => x.CreatedAt)
+
             .ToListAsync();
 
+
         // Nur noch nicht bestätigte Rückerstattungen anzeigen
+
         refundRequests = await Db.RefundRequests
+
             .AsNoTracking()
+
             .Where(x => !x.IsRefundet)
+
             .OrderByDescending(x => x.CreatedAt)
+
             .ToListAsync();
+
+
+        // Falls nach einer Änderung die aktuelle Seite
+        // nicht mehr existiert, auf die letzte gültige Seite.
 
         if (currentPage > totalPages)
         {
-            currentPage = totalPages == 0
-                ? 1
-                : totalPages;
+            currentPage =
+                totalPages == 0
+                    ? 1
+                    : totalPages;
         }
     }
 
+
+    // =========================================================
+    // FILTER ZURÜCKSETZEN
+    // =========================================================
+
+    private void ResetFilters()
+    {
+        _filterName = "";
+
+        _filterEmail = "";
+
+        _filterStatus = "";
+
+        currentPage = 1;
+    }
+
+
+    // =========================================================
+    // PAGINATION
+    // =========================================================
+
     private void GoToPage(int page)
     {
+        if (page < 1 || page > totalPages)
+        {
+            return;
+        }
+
         currentPage = page;
     }
+
 
     private void NextPage()
     {
@@ -258,6 +672,7 @@ else
         }
     }
 
+
     private void PreviousPage()
     {
         if (currentPage > 1)
@@ -266,6 +681,11 @@ else
         }
     }
 
+
+    // =========================================================
+    // REFERENZ ALS BEZAHLT MARKIEREN
+    // =========================================================
+
     private async Task MarkAsPaid()
     {
         if (string.IsNullOrWhiteSpace(searchReference))
@@ -273,24 +693,37 @@ else
             return;
         }
 
+
         await using var Db =
             await DbFactory.CreateDbContextAsync();
+
 
         var invoice = await Db.Invoices
             .FirstOrDefaultAsync(x =>
                 x.Reference == searchReference.Trim());
+
 
         if (invoice == null)
         {
             return;
         }
 
+
         invoice.Status = InvoiceStatus.Paid;
+
         invoice.PaidAt = DateTime.Now;
 
+
         await Db.SaveChangesAsync();
+
+
         await LoadInvoices();
     }
+
+
+    // =========================================================
+    // STATUS ÄNDERN
+    // =========================================================
 
     private async Task ChangeStatus(
         Invoice invoice,
@@ -301,6 +734,7 @@ else
             return;
         }
 
+
         if (!Enum.TryParse<InvoiceStatus>(
                 value,
                 out var newStatus))
@@ -308,66 +742,97 @@ else
             return;
         }
 
-        // Rückerstattungsstatus dürfen nur durch
-        // einzelne Bestätigungen gesetzt werden.
+
+        // Rückerstattungsstatus dürfen nicht manuell
+        // über das Dropdown gesetzt werden.
+
         if (newStatus == InvoiceStatus.Refunded ||
             newStatus == InvoiceStatus.PartlyRefundet)
         {
             return;
         }
 
+
         await using var Db =
             await DbFactory.CreateDbContextAsync();
+
 
         var dbInvoice = await Db.Invoices
             .FirstOrDefaultAsync(x =>
                 x.Id == invoice.Id);
+
 
         if (dbInvoice == null)
         {
             return;
         }
 
+
         dbInvoice.Status = newStatus;
+
+
+        // Bezahlt
 
         if (newStatus == InvoiceStatus.Paid)
         {
             dbInvoice.PaidAt = DateTime.Now;
         }
 
+
+        // Mahnung
+
         if (newStatus == InvoiceStatus.Reminder)
         {
             dbInvoice.ReminderSentAt = DateTime.Now;
         }
 
+
         await Db.SaveChangesAsync();
+
+
         await LoadInvoices();
     }
+
+
+    // =========================================================
+    // RÜCKERSTATTUNG BESTÄTIGEN
+    // =========================================================
 
     private async Task ConfirmRefund(int refundId)
     {
         await using var Db =
             await DbFactory.CreateDbContextAsync();
 
+
         var refund = await Db.RefundRequests
             .FirstOrDefaultAsync(x =>
                 x.Id == refundId);
+
 
         if (refund == null || refund.IsRefundet)
         {
             return;
         }
 
+
         refund.IsRefundet = true;
 
+
         await Db.SaveChangesAsync();
+
 
         await UpdateInvoiceRefundStatus(
             Db,
             refund.InvoiceId);
 
+
         await LoadInvoices();
     }
+
+
+    // =========================================================
+    // RECHNUNGSSTATUS NACH RÜCKERSTATTUNG AKTUALISIEREN
+    // =========================================================
 
     private static async Task UpdateInvoiceRefundStatus(
         ApplicationDbContext Db,
@@ -377,62 +842,105 @@ else
             .FirstOrDefaultAsync(x =>
                 x.Id == invoiceId);
 
+
         if (invoice == null)
         {
             return;
         }
 
+
         var refunds = await Db.RefundRequests
             .Where(x => x.InvoiceId == invoiceId)
             .ToListAsync();
+
 
         if (!refunds.Any())
         {
             return;
         }
 
+
         var confirmedCount =
             refunds.Count(x => x.IsRefundet);
 
+
+        // Alle Rückerstattungen bestätigt
+
         if (confirmedCount == refunds.Count)
         {
-            invoice.Status = InvoiceStatus.Refunded;
+            invoice.Status =
+                InvoiceStatus.Refunded;
         }
+
+        // Mindestens eine Rückerstattung bestätigt
+
         else if (confirmedCount > 0)
         {
-            invoice.Status = InvoiceStatus.PartlyRefundet;
+            invoice.Status =
+                InvoiceStatus.PartlyRefundet;
         }
+
 
         await Db.SaveChangesAsync();
     }
+
+
+    // =========================================================
+    // STATUS-FARBE
+    // =========================================================
 
     private static string GetColor(
         InvoiceStatus status)
     {
         return status switch
         {
-            InvoiceStatus.Open => "orange",
-            InvoiceStatus.Reminder => "red",
-            InvoiceStatus.Paid => "green",
-            InvoiceStatus.Refunded => "violet",
-            InvoiceStatus.PartlyRefundet => "purple",
-            _ => "black"
+            InvoiceStatus.Open =>
+                "orange",
+
+            InvoiceStatus.Reminder =>
+                "red",
+
+            InvoiceStatus.Paid =>
+                "green",
+
+            InvoiceStatus.Refunded =>
+                "violet",
+
+            InvoiceStatus.PartlyRefundet =>
+                "purple",
+
+            _ =>
+                "black"
         };
     }
+
+
+    // =========================================================
+    // STATUS-TEXT
+    // =========================================================
 
     private static string GetText(
         InvoiceStatus status)
     {
         return status switch
         {
-            InvoiceStatus.Open => "Offen",
-            InvoiceStatus.Reminder => "Mahnung",
-            InvoiceStatus.Paid => "Bezahlt",
-            InvoiceStatus.Refunded => "Zurückerstattet",
+            InvoiceStatus.Open =>
+                "Offen",
+
+            InvoiceStatus.Reminder =>
+                "Mahnung",
+
+            InvoiceStatus.Paid =>
+                "Bezahlt",
+
+            InvoiceStatus.Refunded =>
+                "Zurückerstattet",
+
             InvoiceStatus.PartlyRefundet =>
                 "Teilweise zurückerstattet",
-            _ => "-"
+
+            _ =>
+                "-"
         };
     }
 }
-```
