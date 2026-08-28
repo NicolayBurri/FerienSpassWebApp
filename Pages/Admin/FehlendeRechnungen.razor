@@ -136,6 +136,12 @@ else
 
         text.AppendLine($"Gesamtbetrag: CHF {total}");
 
+        text.AppendLine();
+        text.AppendLine("Wenn Sie schon eine Rechnung erstellt haben, keine Sorge. Das bedeutet, dass sich der Status von der Warteliste auf Bestätigt geändert hat.");
+        text.AppendLine($"Wenn Sie nicht wissen, wie Sie die Rechnung erstellen können, klicken Sie auf das Fragezeichensymbol für die Hilfe auf der Website");
+        text.AppendLine();
+        text.AppendLine("Euer FerienSpass Team");
+
         var body = Uri.EscapeDataString(text.ToString());
 
         return $"mailto:{recipient}?subject={subject}&body={body}";
