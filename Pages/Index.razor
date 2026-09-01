@@ -26,9 +26,39 @@
 else
 {
     <h4>Danke für Ihr Interesse. Bitte entnehmen Sie die wichtigsten Informationen auf dieser Startseite.</h4>
-    <h5 style="color:red"> !Das  Sitzbank bemalen am 24.09.2026 findet nicht statt!
-        <br /> 
-        Für den Event Seilpark Balmberg wird eine Alternative gesucht. </h5>
+
+    @if (!string.IsNullOrWhiteSpace(WichtigeInformationenHtml))
+    {
+        <br />
+        <div style="position:relative; background:silver; border:1px solid #ccc; border-radius:8px; padding:20px; margin-bottom:20px;">
+            <div style="position:absolute;
+                    top:-12px;
+                    left:-12px;
+                    width:30px;
+                    height:30px;
+                    border-radius:50%;
+                    background:red;
+                    color:white;
+                    font-weight:bold;
+                    display:flex;
+                    justify-content:center;
+                    align-items:center;
+                    border:2px solid white;">
+            i
+            </div>
+            <div style="
+            color:red;
+            font-size:1.15rem;
+            font-weight:bold;
+            line-height:2;
+            margin-bottom:1px;">
+
+                @((MarkupString)WichtigeInformationenHtml)
+
+            </div>
+
+        </div>
+    }
 
     <br />
 
@@ -124,6 +154,7 @@ else
     private List<DocItem> Documents = new();
     private SystemSettings? settings;
     private bool isKursleiter;
+    private string WichtigeInformationenHtml = "";
 
     private List<string> Sponsoren = new();
     private int sponsorIndex = 0;
@@ -155,7 +186,13 @@ else
 
         if (Directory.Exists(folder))
         {
-            var files = Directory.GetFiles(folder, "*.docx");
+            var files = Directory.GetFiles(folder, "*.docx")
+                .Where(x =>
+                    !Path.GetFileName(x)
+                        .Equals(
+                            "WichtigeInformationen.docx",
+                            StringComparison.OrdinalIgnoreCase))
+                .ToArray();
 
             Documents = files.Select(file => new DocItem
                 {
@@ -165,6 +202,39 @@ else
                         ""),
                     Html = DocxService.ConvertToHtml(file)
                 }).ToList();
+        }
+
+        var wichtigeInfosDatei = Path.Combine(
+                Env.WebRootPath,
+                "configsheets/Informationen",
+                "WichtigeInformationen.docx");
+
+        if (File.Exists(wichtigeInfosDatei))
+        {
+            var html =
+                DocxService.ConvertToHtml(wichtigeInfosDatei);
+
+            html = Regex.Replace(
+                html,
+                @"<style[^>]*>.*?</style>",
+                "",
+                RegexOptions.IgnoreCase |
+                RegexOptions.Singleline);
+
+            html = Regex.Replace(
+                html,
+                @"<script[^>]*>.*?</script>",
+                "",
+                RegexOptions.IgnoreCase |
+                RegexOptions.Singleline);
+
+            html = Regex.Replace(
+                html,
+                @"\sstyle\s*=\s*[""'][^""']*[""']",
+                "",
+                RegexOptions.IgnoreCase);
+
+            WichtigeInformationenHtml = html;
         }
 
         LoadSponsors();
