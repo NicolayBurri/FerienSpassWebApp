@@ -8,11 +8,15 @@
 @using Microsoft.AspNetCore.Components
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.JSInterop
+@using System.Net
+@using System.Net.Mail
+@using System.Text
 
 @attribute [Authorize(Roles = "Admin,Kursleiter")]
 
 @inject IJSRuntime JS
 @inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject IConfiguration Configuration
 
 <h1>Event Details</h1>
 
@@ -25,6 +29,44 @@
 else
 {
     <h2>@ev.Eventname</h2>
+
+    @if (canSendEventMail)
+    {
+        <div style="margin:15px 0 25px 0;">
+            <button class="btn @(HasEnoughChildren ? "btn-success" : "btn-danger")"
+                    @onclick="ProcessEventEmails"
+                    disabled="@isSendingEventMail">
+
+                @if (isSendingEventMail)
+                {
+                    <span>E-Mails werden versendet...</span>
+                }
+                else if (HasEnoughChildren)
+                {
+                    <span>📧 Bestätigungsmails senden</span>
+                }
+                else
+                {
+                    <span>📧 Absagemails senden</span>
+                }
+            </button>
+
+            @if (!string.IsNullOrWhiteSpace(eventMailMessage))
+            {
+                <div style="margin-top:10px;">
+                    <b>@eventMailMessage</b>
+                </div>
+            }
+
+            @if (!HasEnoughChildren)
+            {
+                <div style="margin-top:8px; color:darkred;">
+                    Mindestanzahl: @MinimumChildren |
+                    Bestätigt: @ConfirmedChildrenCount
+                </div>
+            }
+        </div>
+    }
 
     <br />
 
@@ -99,8 +141,8 @@ else
                 <b>Notfallkontakte (Eltern):</b>
 
                 @if (contactsByParent.TryGetValue(
-                    entry.Child.ParentUserId,
-                    out var contacts))
+               entry.Child.ParentUserId,
+               out var contacts))
                 {
                     @foreach (var c in contacts)
                     {
@@ -207,7 +249,7 @@ else
             </div>
 
             @if (driverSearchPerformed &&
-                 !driverSearchResults.Any())
+           !driverSearchResults.Any())
             {
                 <p style="color:gray;">
                     Keine Benutzer gefunden.
@@ -350,7 +392,7 @@ else
             </div>
 
             @if (helperSearchPerformed &&
-                 !helperSearchResults.Any())
+           !helperSearchResults.Any())
             {
                 <p style="color:gray;">
                     Keine Benutzer gefunden.
@@ -514,6 +556,23 @@ else
     private Dictionary<string, List<EmergencyContact>>
         contactsByParent = new();
 
+    private SystemSettings? systemSettings;
+
+    private bool isSendingEventMail = false;
+    private string? eventMailMessage;
+
+    private int MinimumChildren => ev?.MinKinder ?? 0;
+
+    private int ConfirmedChildrenCount =>
+        registrations.Count(x => x.Status == EnrollmentStatus.Confirmed);
+
+    private bool HasEnoughChildren =>
+        ConfirmedChildrenCount >= MinimumChildren;
+
+    private bool canSendEventMail =>
+        systemSettings?.AnmeldungEnde.HasValue == true &&
+        DateTime.Now > systemSettings.AnmeldungEnde.Value;
+
 
     // =========================================================
     // USER SEARCH DTO
@@ -551,6 +610,10 @@ else
     {
         await using var Db =
             await DbFactory.CreateDbContextAsync();
+
+        systemSettings = await Db.SystemSettings
+            .AsNoTracking()
+            .FirstOrDefaultAsync();
 
         ev = await Db.Events
             .Include(x => x.Kursleiter)
@@ -640,15 +703,15 @@ else
             .ThenBy(x => x.Vorname)
             .Take(30)
             .Select(x => new UserSearchResult
-            {
-                Id = x.Id,
-                Vorname = x.Vorname,
-                Nachname = x.Nachname,
-                Ort = x.Ort,
-                Email = x.Email,
-                Telefonnummer = x.Telefonnummer,
-                Seats = 1
-            })
+                {
+                    Id = x.Id,
+                    Vorname = x.Vorname,
+                    Nachname = x.Nachname,
+                    Ort = x.Ort,
+                    Email = x.Email,
+                    Telefonnummer = x.Telefonnummer,
+                    Seats = 1
+                })
             .ToListAsync();
     }
 
@@ -700,12 +763,12 @@ else
 
 
         var assignment = new EventRoleAssignment
-        {
-            EventId = eventId,
-            UserId = user.Id,
-            Role = RoleType.Driver,
-            Seats = user.Seats
-        };
+            {
+                EventId = eventId,
+                UserId = user.Id,
+                Role = RoleType.Driver,
+                Seats = user.Seats
+            };
 
 
         Db.EventRoleAssignments.Add(assignment);
@@ -751,11 +814,11 @@ else
 
 
         var assignment = new EventRoleAssignment
-        {
-            EventId = eventId,
-            UserId = user.Id,
-            Role = RoleType.Helper
-        };
+            {
+                EventId = eventId,
+                UserId = user.Id,
+                Role = RoleType.Helper
+            };
 
 
         Db.EventRoleAssignments.Add(assignment);
@@ -772,6 +835,624 @@ else
         helperSearchResults.Remove(user);
 
         StateHasChanged();
+    }
+
+
+    // =========================================================
+    // BESTÄTIGUNG / ABSAGE PER SMTP
+    // =========================================================
+
+    private sealed class EventMailRecipient
+    {
+        public string Email { get; set; } = "";
+        public string Name { get; set; } = "";
+        public bool IsParent { get; set; }
+        public bool IsDriver { get; set; }
+        public bool IsHelper { get; set; }
+        public int Seats { get; set; }
+
+        // Nur für Eltern: eigene bestätigte Kinder.
+        public List<string> ChildNames { get; set; } = new();
+    }
+
+
+    async Task ProcessEventEmails()
+    {
+        if (ev == null || isSendingEventMail)
+            return;
+
+        isSendingEventMail = true;
+        eventMailMessage = null;
+
+        try
+        {
+            await using var Db =
+                await DbFactory.CreateDbContextAsync();
+
+            // Immer nochmals serverseitig prüfen.
+            var settings = await Db.SystemSettings
+                .AsNoTracking()
+                .FirstOrDefaultAsync();
+
+            if (settings?.AnmeldungEnde == null ||
+                DateTime.Now <= settings.AnmeldungEnde.Value)
+            {
+                eventMailMessage =
+                    "Das Anmeldefenster ist noch nicht beendet.";
+                return;
+            }
+
+            var currentEvent = await Db.Events
+                .AsNoTracking()
+                .Include(x => x.Kursleiter)
+                    .ThenInclude(x => x.User)
+                .FirstOrDefaultAsync(x => x.Id == eventId);
+
+            if (currentEvent == null)
+            {
+                eventMailMessage = "Event wurde nicht gefunden.";
+                return;
+            }
+
+            var confirmedChildren = await Db.EventChildren
+                .AsNoTracking()
+                .Where(x =>
+                    x.EventId == eventId &&
+                    x.Status == EnrollmentStatus.Confirmed)
+                .Include(x => x.Child)
+                    .ThenInclude(x => x.ParentUser)
+                .OrderBy(x => x.Child.ParentUser!.Nachname)
+                .ThenBy(x => x.Child.Name)
+                .ToListAsync();
+
+            var assignments = await Db.EventRoleAssignments
+                .AsNoTracking()
+                .Where(x =>
+                    x.EventId == eventId &&
+                    (x.Role == RoleType.Driver ||
+                     x.Role == RoleType.Helper))
+                .Include(x => x.User)
+                .ToListAsync();
+
+            // Eine E-Mail pro eindeutiger Adresse.
+            var recipients =
+                new Dictionary<string, EventMailRecipient>(
+                    StringComparer.OrdinalIgnoreCase);
+
+            foreach (var registration in confirmedChildren)
+            {
+                var parent = registration.Child.ParentUser;
+
+                if (parent == null ||
+                    string.IsNullOrWhiteSpace(parent.Email))
+                {
+                    continue;
+                }
+
+                var parentRecipient = AddOrMergeRecipient(
+                    recipients,
+                    parent.Email,
+                    $"{parent.Vorname} {parent.Nachname}".Trim(),
+                    isParent: true,
+                    isDriver: false,
+                    isHelper: false,
+                    seats: 0);
+
+                var childName =
+                    $"{registration.Child.Name} {parent.Nachname}".Trim();
+
+                if (!parentRecipient.ChildNames.Any(x =>
+                    string.Equals(
+                        x,
+                        childName,
+                        StringComparison.OrdinalIgnoreCase)))
+                {
+                    parentRecipient.ChildNames.Add(childName);
+                }
+            }
+
+            foreach (var assignment in assignments)
+            {
+                var user = assignment.User;
+
+                if (user == null ||
+                    string.IsNullOrWhiteSpace(user.Email))
+                {
+                    continue;
+                }
+
+                AddOrMergeRecipient(
+                    recipients,
+                    user.Email,
+                    $"{user.Vorname} {user.Nachname}".Trim(),
+                    isParent: false,
+                    isDriver: assignment.Role == RoleType.Driver,
+                    isHelper: assignment.Role == RoleType.Helper,
+                    seats: assignment.Role == RoleType.Driver
+                        ? assignment.Seats ?? 0
+                        : 0);
+            }
+
+            if (!recipients.Any())
+            {
+                eventMailMessage =
+                    "Es wurden keine gültigen E-Mail-Adressen gefunden.";
+                return;
+            }
+
+            var confirmedCount = confirmedChildren.Count;
+            var minimumChildren = currentEvent.MinKinder;
+
+            // Nach Ende des Anmeldefensters entscheidet MinKinder
+            // automatisch, ob Bestätigungen oder Absagen verschickt werden.
+            var isCancellation =
+                confirmedCount < minimumChildren;
+
+            var allChildrenText =
+                BuildChildrenList(confirmedChildren);
+
+            var allDriversText =
+                BuildDriversList(assignments);
+
+            var allHelpersText =
+                BuildHelpersList(assignments);
+
+            var courseLeaderText =
+                BuildCourseLeaderText(currentEvent);
+
+            int sent = 0;
+            var failed = new List<string>();
+
+            foreach (var recipient in recipients.Values)
+            {
+                try
+                {
+                    // Datenschutz:
+                    // Eltern sehen nur ihre eigenen bestätigten Kinder.
+                    // Reine Fahrer/Betreuungspersonen sehen für die
+                    // Organisation die vollständige Kinderliste.
+                    //
+                    // Ist eine Person gleichzeitig Elternteil und Fahrer/
+                    // Betreuungsperson, gilt die strengere Elternansicht:
+                    // Es werden nur die eigenen Kinder angezeigt.
+                    var childrenTextForRecipient =
+                        recipient.IsParent
+                            ? BuildRecipientChildrenList(recipient)
+                            : allChildrenText;
+
+                    var subject = isCancellation
+                        ? $"Absage – {currentEvent.Eventname}"
+                        : $"Bestätigung – {currentEvent.Eventname}";
+
+                    var body = isCancellation
+                        ? BuildCancellationBody(
+                            currentEvent,
+                            recipient,
+                            confirmedCount,
+                            minimumChildren,
+                            childrenTextForRecipient,
+                            allDriversText,
+                            allHelpersText,
+                            courseLeaderText)
+                        : BuildConfirmationBody(
+                            currentEvent,
+                            recipient,
+                            childrenTextForRecipient,
+                            allDriversText,
+                            allHelpersText,
+                            courseLeaderText);
+
+
+                    var mailto =
+                        "mailto:" +
+                        Uri.EscapeDataString(recipient.Email) +
+                        $"?subject={Uri.EscapeDataString(subject)}" +
+                        $"&body={Uri.EscapeDataString(body)}";
+
+                    await JS.InvokeVoidAsync(
+                        "open",
+                        mailto,
+                        "_blank");
+
+                    sent++;
+                }
+                catch (Exception ex)
+                {
+                    failed.Add(
+                        $"{recipient.Email}: {ex.Message}");
+                }
+            }
+
+            if (failed.Any())
+            {
+                eventMailMessage =
+                    $"{sent} E-Mail(s) versendet, " +
+                    $"{failed.Count} fehlgeschlagen: " +
+                    string.Join(" | ", failed);
+            }
+            else
+            {
+                eventMailMessage = isCancellation
+                    ? $"{sent} Absage-E-Mail(s) wurden versendet."
+                    : $"{sent} Bestätigungs-E-Mail(s) wurden versendet.";
+            }
+        }
+        catch (Exception ex)
+        {
+            eventMailMessage =
+                $"Fehler beim Mailversand: {ex.Message}";
+        }
+        finally
+        {
+            isSendingEventMail = false;
+        }
+    }
+
+
+    private static EventMailRecipient AddOrMergeRecipient(
+        Dictionary<string, EventMailRecipient> recipients,
+        string email,
+        string name,
+        bool isParent,
+        bool isDriver,
+        bool isHelper,
+        int seats)
+    {
+        email = email.Trim();
+
+        if (!recipients.TryGetValue(email, out var recipient))
+        {
+            recipient = new EventMailRecipient
+                {
+                    Email = email,
+                    Name = name
+                };
+
+            recipients[email] = recipient;
+        }
+
+        if (string.IsNullOrWhiteSpace(recipient.Name) &&
+            !string.IsNullOrWhiteSpace(name))
+        {
+            recipient.Name = name;
+        }
+
+        recipient.IsParent |= isParent;
+        recipient.IsDriver |= isDriver;
+        recipient.IsHelper |= isHelper;
+
+        if (isDriver)
+        {
+            recipient.Seats =
+                Math.Max(recipient.Seats, seats);
+        }
+
+        return recipient;
+    }
+
+
+    private static string BuildRecipientChildrenList(
+        EventMailRecipient recipient)
+    {
+        var lines = recipient.ChildNames
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(x => x)
+            .Select(x => $"- {x}")
+            .ToList();
+
+        return lines.Any()
+            ? string.Join(Environment.NewLine, lines)
+            : "- Keine eigenen bestätigten Kinder";
+    }
+
+
+    private static string BuildChildrenList(
+        IEnumerable<EventChild> confirmedChildren)
+    {
+        var lines = confirmedChildren
+            .Select(x =>
+                $"- {x.Child.Name} {x.Child.ParentUser?.Nachname}".Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        return lines.Any()
+            ? string.Join(Environment.NewLine, lines)
+            : "- Keine bestätigten Kinder";
+    }
+
+
+    private static string BuildDriversList(
+        IEnumerable<EventRoleAssignment> assignments)
+    {
+        var lines = assignments
+            .Where(x =>
+                x.Role == RoleType.Driver &&
+                x.User != null)
+            .Select(x =>
+                $"- {x.User!.Vorname} {x.User.Nachname}" +
+                $" ({x.Seats ?? 0} Sitzplätze)")
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        return lines.Any()
+            ? string.Join(Environment.NewLine, lines)
+            : "- Keine Fahrer";
+    }
+
+
+    private static string BuildHelpersList(
+        IEnumerable<EventRoleAssignment> assignments)
+    {
+        var lines = assignments
+            .Where(x =>
+                x.Role == RoleType.Helper &&
+                x.User != null)
+            .Select(x =>
+                $"- {x.User!.Vorname} {x.User.Nachname}".Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        return lines.Any()
+            ? string.Join(Environment.NewLine, lines)
+            : "- Keine Betreuungspersonen";
+    }
+
+
+    private static string BuildCourseLeaderText(
+        FerienspassWebApp.Models.Event currentEvent)
+    {
+        var names =
+            currentEvent.Kursleiter?
+                .Where(x => x.User != null)
+                .Select(x =>
+                    $"{x.User!.Vorname} {x.User.Nachname}".Trim())
+                .Where(x =>
+                    !string.IsNullOrWhiteSpace(x))
+                .ToList()
+            ?? new List<string>();
+
+        return names.Any()
+            ? string.Join(", ", names)
+            : "Ferienspass-Team";
+    }
+
+
+    private static string RecipientRoleText(
+        EventMailRecipient recipient)
+    {
+        var parts = new List<string>();
+
+        if (recipient.IsParent)
+            parts.Add("Eltern / Erziehungsberechtigte");
+
+        if (recipient.IsDriver)
+            parts.Add(
+                $"Fahrer/in ({recipient.Seats} Sitzplätze)");
+
+        if (recipient.IsHelper)
+            parts.Add("Betreuungsperson");
+
+        return parts.Any()
+            ? string.Join(", ", parts)
+            : "Teilnehmende Person";
+    }
+
+
+    private static string BuildConfirmationBody(
+        FerienspassWebApp.Models.Event currentEvent,
+        EventMailRecipient recipient,
+        string childrenTextForRecipient,
+        string allDriversText,
+        string allHelpersText,
+        string courseLeaderText)
+    {
+        var sb = new StringBuilder();
+
+        sb.AppendLine(
+            string.IsNullOrWhiteSpace(recipient.Name)
+                ? "Guten Tag"
+                : $"Guten Tag {recipient.Name}");
+
+        sb.AppendLine();
+        sb.AppendLine(
+            $"Der Anlass \"{currentEvent.Eventname}\" findet statt.");
+
+        sb.AppendLine();
+        sb.AppendLine("EVENTDETAILS");
+        sb.AppendLine("------------------------------");
+        sb.AppendLine(
+            $"Datum: {currentEvent.StartZeit?.ToString("dd.MM.yyyy")}");
+        sb.AppendLine(
+            $"Beginn: {currentEvent.StartZeit?.ToString("HH:mm")} Uhr");
+        sb.AppendLine(
+            $"Ende: {currentEvent.EndeZeit?.ToString("HH:mm")} Uhr");
+        sb.AppendLine(
+            $"Ort: {currentEvent.Location}");
+        sb.AppendLine(
+            $"Treffpunkt: {currentEvent.Treffpunkt}");
+
+        if (!string.IsNullOrWhiteSpace(currentEvent.Beschreibung))
+        {
+            sb.AppendLine();
+            sb.AppendLine("BESCHREIBUNG");
+            sb.AppendLine("------------------------------");
+            sb.AppendLine(currentEvent.Beschreibung);
+        }
+
+        sb.AppendLine();
+        sb.AppendLine(
+            recipient.IsParent
+                ? "IHRE BESTÄTIGTEN KINDER"
+                : "BESTÄTIGTE KINDER");
+        sb.AppendLine("------------------------------");
+        sb.AppendLine(childrenTextForRecipient);
+
+        sb.AppendLine();
+        sb.AppendLine("FAHRER");
+        sb.AppendLine("------------------------------");
+        sb.AppendLine(allDriversText);
+
+        sb.AppendLine();
+        sb.AppendLine("BETREUUNGSPERSONEN");
+        sb.AppendLine("------------------------------");
+        sb.AppendLine(allHelpersText);
+
+        sb.AppendLine();
+        sb.AppendLine(
+            "Bei Fragen dürfen Sie sich gerne an die Kursleitung wenden.");
+
+        sb.AppendLine();
+        sb.AppendLine("Freundliche Grüsse");
+        sb.AppendLine(courseLeaderText);
+
+        return sb.ToString();
+    }
+
+
+    private static string BuildCancellationBody(
+        FerienspassWebApp.Models.Event currentEvent,
+        EventMailRecipient recipient,
+        int confirmedCount,
+        int minimumChildren,
+        string childrenTextForRecipient,
+        string allDriversText,
+        string allHelpersText,
+        string courseLeaderText)
+    {
+        var sb = new StringBuilder();
+
+        sb.AppendLine(
+            string.IsNullOrWhiteSpace(recipient.Name)
+                ? "Guten Tag"
+                : $"Guten Tag {recipient.Name}");
+
+        sb.AppendLine();
+        sb.AppendLine(
+            $"Leider müssen wir den Anlass " +
+            $"\"{currentEvent.Eventname}\" absagen.");
+
+        sb.AppendLine();
+        sb.AppendLine(
+            "Die erforderliche Mindestteilnehmerzahl " +
+            "wurde nicht erreicht.");
+
+        sb.AppendLine(
+            $"Mindestanzahl Kinder: {minimumChildren}");
+        sb.AppendLine(
+            $"Bestätigte Kinder: {confirmedCount}");
+
+        sb.AppendLine();
+        sb.AppendLine(
+            $"Ihre Funktion: {RecipientRoleText(recipient)}");
+
+        sb.AppendLine();
+        sb.AppendLine("GEPLANTE EVENTDETAILS");
+        sb.AppendLine("------------------------------");
+        sb.AppendLine(
+            $"Datum: {currentEvent.StartZeit?.ToString("dd.MM.yyyy")}");
+        sb.AppendLine(
+            $"Beginn: {currentEvent.StartZeit?.ToString("HH:mm")} Uhr");
+        sb.AppendLine(
+            $"Ende: {currentEvent.EndeZeit?.ToString("HH:mm")} Uhr");
+        sb.AppendLine(
+            $"Ort: {currentEvent.Location}");
+        sb.AppendLine(
+            $"Treffpunkt: {currentEvent.Treffpunkt}");
+
+        if (!string.IsNullOrWhiteSpace(currentEvent.Beschreibung))
+        {
+            sb.AppendLine();
+            sb.AppendLine("BESCHREIBUNG");
+            sb.AppendLine("------------------------------");
+            sb.AppendLine(currentEvent.Beschreibung);
+        }
+
+        sb.AppendLine();
+        sb.AppendLine(
+            recipient.IsParent
+                ? "IHRE BETROFFENEN KINDER"
+                : "ANGEMELDETE / BESTÄTIGTE KINDER");
+        sb.AppendLine("------------------------------");
+        sb.AppendLine(childrenTextForRecipient);
+
+        sb.AppendLine();
+        sb.AppendLine("EINGETRAGENE FAHRER");
+        sb.AppendLine("------------------------------");
+        sb.AppendLine(allDriversText);
+
+        sb.AppendLine();
+        sb.AppendLine("EINGETRAGENE BETREUUNGSPERSONEN");
+        sb.AppendLine("------------------------------");
+        sb.AppendLine(allHelpersText);
+
+        sb.AppendLine();
+        sb.AppendLine(
+            "Vielen Dank für Ihr Verständnis und Ihre Bereitschaft zur Mithilfe.");
+
+        sb.AppendLine();
+        sb.AppendLine("Freundliche Grüsse");
+        sb.AppendLine(courseLeaderText);
+
+        return sb.ToString();
+    }
+
+
+    private async Task SendSmtpMailAsync(
+    string recipient,
+    string subject,
+    string body)
+    {
+        var host =
+            Configuration["Email:Smtp"];
+
+        var username =
+            Configuration["Email:User"];
+
+        var password =
+            Configuration["Email:Pass"];
+
+        var from =
+            Configuration["Email:From"];
+
+        var port =
+            int.TryParse(
+                Configuration["Email:Port"],
+                out var configuredPort)
+                    ? configuredPort
+                    : 587;
+
+        if (string.IsNullOrWhiteSpace(host))
+            throw new InvalidOperationException(
+                "SMTP-Server fehlt in der Konfiguration.");
+
+        if (string.IsNullOrWhiteSpace(from))
+            throw new InvalidOperationException(
+                "SMTP-Absender fehlt in der Konfiguration.");
+
+        using var message = new MailMessage();
+
+        message.From =
+            new MailAddress(
+                from,
+                "Ferienspass");
+
+        message.To.Add(recipient);
+        message.Subject = subject;
+        message.Body = body;
+        message.IsBodyHtml = false;
+
+        using var client =
+            new SmtpClient(host, port);
+
+        client.EnableSsl = true;
+
+        client.Credentials =
+            new NetworkCredential(
+                username,
+                password);
+
+        await client.SendMailAsync(message);
     }
 
 
