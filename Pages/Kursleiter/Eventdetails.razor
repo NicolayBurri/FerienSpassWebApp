@@ -137,6 +137,22 @@ else
                     @GetStatusText(entry.Status)
                 </span>
 
+                @if (entry.Status == EnrollmentStatus.Confirmed)
+                {
+                    @if (entry.IsInvoiced)
+                    {
+                        <span class="badge bg-success ms-2">
+                            Rechnung erstellt
+                        </span>
+                    }
+                    else
+                    {
+                        <span class="badge bg-danger ms-2">
+                            Rechnung fehlt
+                        </span>
+                    }
+                }
+
                 <hr />
 
                 <b>Notfallkontakte (Eltern):</b>
