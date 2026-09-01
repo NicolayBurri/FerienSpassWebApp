@@ -4,10 +4,15 @@
 @using FerienspassWebApp.Models
 @using FerienspassWebApp.Data
 @using Microsoft.AspNetCore.Authorization
+@using ClosedXML.Excel
+@using Microsoft.JSInterop
+@using Microsoft.AspNetCore.Components
 
 @attribute [Authorize(Roles = "Admin,Kursleiter")]
 
 @inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject IJSRuntime JS
+@inject AuthenticationStateProvider AuthenticationStateProvider
 
 <PageTitle>Rechnungsverwaltung</PageTitle>
 
@@ -15,25 +20,262 @@
 
 
 @* =========================================================
-   REFERENZNUMMER ALS BEZAHLT MARKIEREN
+   ZAHLUNG ÜBER REFERENZNUMMER - NUR ADMIN
    ========================================================= *@
 
-<div style="margin-bottom:20px;">
+<AuthorizeView Roles="Admin">
 
-    <input class="form-control"
-           placeholder="Referenznummer eingeben"
-           @bind="searchReference" />
+    <div style="margin-bottom:20px;">
 
-    <br />
+        <div class="d-flex gap-2"
+             style="max-width:600px;">
 
-    <button class="btn btn-success"
-            @onclick="MarkAsPaid">
-        Als bezahlt markieren
+            <input class="form-control"
+                   placeholder="Referenznummer eingeben"
+                   @bind="searchReference" />
+
+            <button class="btn btn-success"
+                    @onclick="SearchInvoiceForPayment">
+                Prüfen
+            </button>
+
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(paymentSearchError))
+        {
+            <div class="alert alert-danger mt-2">
+                @paymentSearchError
+            </div>
+        }
+
+    </div>
+
+    @if (showPaymentModal && paymentInvoice != null)
+    {
+        <div class="modal fade show d-block"
+             tabindex="-1"
+             style="background-color:rgba(0,0,0,0.5);">
+
+            <div class="modal-dialog">
+                <div class="modal-content">
+
+                    <div class="modal-header">
+
+                        <h5 class="modal-title">
+                            Zahlung kontrollieren
+                        </h5>
+
+                        <button type="button"
+                                class="btn-close"
+                                @onclick="ClosePaymentModal">
+                        </button>
+
+                    </div>
+
+                    <div class="modal-body">
+
+                        <div class="alert alert-info">
+                            Bitte kontrollieren Sie die Angaben,
+                            bevor die Zahlung bestätigt wird.
+                        </div>
+
+                        <table class="table">
+
+                            <tbody>
+
+                                <tr>
+                                    <th>Referenznummer</th>
+                                    <td>
+                                        @paymentInvoice.Reference
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <th>Name</th>
+                                    <td>
+                                        @paymentInvoice.ParentUser?.Vorname
+                                        @paymentInvoice.ParentUser?.Nachname
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <th>E-Mail</th>
+                                    <td>
+                                        @(paymentInvoice.ParentUser?.Email ?? "-")
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <th>Adresse</th>
+                                    <td>
+                                        @(paymentInvoice.ParentUser?.Strasse ?? "-")
+                                        <br />
+                                        @(paymentInvoice.ParentUser?.PLZ ?? "")
+                                        @(paymentInvoice.ParentUser?.Ort ?? "")
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <th>Betrag</th>
+                                    <td>
+                                        <strong>
+                                            CHF @paymentInvoice.TotalAmount.ToString("0.00")
+                                        </strong>
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <th>Aktueller Status</th>
+                                    <td>
+                                        @GetText(paymentInvoice.Status)
+                                    </td>
+                                </tr>
+
+                            </tbody>
+
+                        </table>
+
+
+                        @if (paymentInvoice.Status == InvoiceStatus.Paid)
+                        {
+                            <div class="alert alert-warning">
+                                Diese Rechnung ist bereits als bezahlt markiert.
+                            </div>
+                        }
+
+                    </div>
+
+                    <div class="modal-footer">
+
+                        <button class="btn btn-secondary"
+                                @onclick="ClosePaymentModal">
+                            Abbrechen
+                        </button>
+
+                        @if (paymentInvoice.Status != InvoiceStatus.Paid)
+                        {
+                            <button class="btn btn-success"
+                                    @onclick="ConfirmPayment">
+                                Zahlung bestätigen
+                            </button>
+                        }
+
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    }
+
+    <hr />
+
+</AuthorizeView>
+
+@* =========================================================
+   BUCHHALTUNG / JAHRESAUSWERTUNG
+   ========================================================= *@
+
+<AuthorizeView Roles="Admin">
+    <button class="btn btn-primary mb-3"
+            @onclick="OpenAccountingModal">
+        Buchhaltung
     </button>
+</AuthorizeView>
 
-</div>
+ <AuthorizeView Roles="Admin">
+    @if (showAccountingModal)
+    {
+        <div class="modal fade show d-block"
+             tabindex="-1"
+             style="background-color:rgba(0,0,0,0.5);">
 
-<hr />
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+
+                    <div class="modal-header">
+                        <h5 class="modal-title">
+                            Buchhaltung
+                        </h5>
+
+                        <button type="button"
+                                class="btn-close"
+                                @onclick="CloseAccountingModal">
+                        </button>
+                    </div>
+
+                    <div class="modal-body">
+
+                        <div class="row g-3">
+
+                            <div class="col-md-6">
+
+                                <label class="form-label">
+                                    Jahr
+                                </label>
+
+                                <select class="form-select"
+                                        @bind="AccountingYear">
+
+                                    @foreach (var year in AccountingYears)
+                                    {
+                                        <option value="@year">
+                                            @year
+                                        </option>
+                                    }
+
+                                </select>
+
+                            </div>
+
+                        </div>
+
+                        <hr />
+
+                        <div class="row g-3">
+
+                            <div class="col-md-3">
+                                <strong>Total Rechnungen</strong><br />
+                                CHF @AccountingTotal.ToString("0.00")
+                            </div>
+
+                            <div class="col-md-3">
+                                <strong>Noch geschuldet</strong><br />
+                                CHF @AccountingOutstanding.ToString("0.00")
+                            </div>
+
+                            <div class="col-md-3">
+                                <strong>Rückerstattet</strong><br />
+                                CHF @AccountingRefunded.ToString("0.00")
+                            </div>
+
+                            <div class="col-md-3">
+                                <strong>Netto bezahlt</strong><br />
+                                CHF @AccountingNetPaid.ToString("0.00")
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                    <div class="modal-footer">
+
+                        <button class="btn btn-secondary"
+                                @onclick="CloseAccountingModal">
+                            Schliessen
+                        </button>
+
+                        <button class="btn btn-success"
+                                @onclick="ExportAccountingExcel">
+                            Excel erstellen
+                        </button>
+
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    }
+ </AuthorizeView>
 
 
 @* =========================================================
@@ -425,12 +667,32 @@ else
 
     private List<RefundRequest> refundRequests = new();
 
+    private List<RefundRequest> allRefundRequests = new();
+
+    private bool showAccountingModal = false;
+
+    private void OpenAccountingModal()
+    {
+        showAccountingModal = true;
+    }
+
+    private void CloseAccountingModal()
+    {
+        showAccountingModal = false;
+    }
+
 
     // =========================================================
     // REFERENZ-SUCHE
     // =========================================================
 
     private string? searchReference;
+
+    private Invoice? paymentInvoice;
+
+    private bool showPaymentModal = false;
+
+    private string? paymentSearchError;
 
 
     // =========================================================
@@ -575,6 +837,60 @@ else
             filteredInvoices.Count / (double)pageSize
         );
 
+    // =========================================================
+    // BUCHHALTUNG
+    // =========================================================
+
+    private int AccountingYear = DateTime.Now.Year;
+
+    private List<int> AccountingYears =>
+        invoices
+            .Select(x => x.CreatedAt.Year)
+            .Distinct()
+            .OrderByDescending(x => x)
+            .ToList();
+
+    private List<Invoice> AccountingInvoice =>
+        invoices
+            .Where(x => x.CreatedAt.Year == AccountingYear)
+            .ToList();
+
+    private decimal AccountingTotal =>
+        AccountingInvoice.Sum(x => x.TotalAmount);
+
+    private decimal AccountingOutstanding =>
+        AccountingInvoice
+            .Where(x =>
+                x.Status == InvoiceStatus.Open ||
+                x.Status == InvoiceStatus.Reminder)
+            .Sum(x => x.TotalAmount);
+
+    private decimal AccountingRefunded
+    {
+        get
+        {
+            var invoiceIds = AccountingInvoice
+                .Select(x => x.Id)
+                .ToHashSet();
+
+            return allRefundRequests
+                .Where(x =>
+                    invoiceIds.Contains(x.InvoiceId) &&
+                    x.IsRefundet)
+                .Sum(x => (decimal)(x.Amount ?? 0));
+        }
+    }
+
+    private decimal AccountingPaid =>
+        AccountingInvoice
+            .Where(x =>
+                x.Status == InvoiceStatus.Paid ||
+                x.Status == InvoiceStatus.PartlyRefundet ||
+                x.Status == InvoiceStatus.Refunded)
+            .Sum(x => x.TotalAmount);
+
+    private decimal AccountingNetPaid =>
+        AccountingPaid - AccountingRefunded;
 
     // =========================================================
     // INITIALISIERUNG
@@ -617,6 +933,10 @@ else
 
             .OrderByDescending(x => x.CreatedAt)
 
+            .ToListAsync();
+
+        allRefundRequests = await Db.RefundRequests
+            .AsNoTracking()
             .ToListAsync();
 
 
@@ -686,10 +1006,23 @@ else
     // REFERENZ ALS BEZAHLT MARKIEREN
     // =========================================================
 
-    private async Task MarkAsPaid()
+    
+    // RECHNUNG FÜR ZAHLUNG SUCHEN
+
+    private async Task SearchInvoiceForPayment()
     {
+        if (!await IsAdmin())
+            return;
+
+        paymentSearchError = null;
+        paymentInvoice = null;
+
+
         if (string.IsNullOrWhiteSpace(searchReference))
         {
+            paymentSearchError =
+                "Bitte eine Referenznummer eingeben.";
+
             return;
         }
 
@@ -699,25 +1032,91 @@ else
 
 
         var invoice = await Db.Invoices
+            .AsNoTracking()
+            .Include(x => x.ParentUser)
             .FirstOrDefaultAsync(x =>
                 x.Reference == searchReference.Trim());
 
 
         if (invoice == null)
         {
+            paymentSearchError =
+                "Es wurde keine Rechnung mit dieser Referenznummer gefunden.";
+
             return;
         }
 
 
+        paymentInvoice = invoice;
+
+        showPaymentModal = true;
+    }
+
+    // ZAHLUNG BESTÄTIGEN
+
+    private async Task ConfirmPayment()
+    {
+        if (!await IsAdmin())
+            return;
+
+        if (paymentInvoice == null)
+            return;
+
+        await using var Db =
+            await DbFactory.CreateDbContextAsync();
+
+        var invoice = await Db.Invoices
+            .FirstOrDefaultAsync(x =>
+                x.Id == paymentInvoice.Id);
+
+        if (invoice == null)
+        {
+            paymentSearchError =
+                "Die Rechnung wurde nicht mehr gefunden.";
+
+            return;
+        }
+
+        // Status wirklich ändern
         invoice.Status = InvoiceStatus.Paid;
-
         invoice.PaidAt = DateTime.Now;
-
 
         await Db.SaveChangesAsync();
 
+        // Zur Kontrolle nochmals frisch aus DB lesen
+        var savedInvoice = await Db.Invoices
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x =>
+                x.Id == invoice.Id);
 
+        if (savedInvoice == null ||
+            savedInvoice.Status != InvoiceStatus.Paid)
+        {
+            paymentSearchError =
+                "Der Zahlungsstatus konnte nicht gespeichert werden.";
+
+            return;
+        }
+
+        // Popup schliessen
+        showPaymentModal = false;
+        paymentInvoice = null;
+        searchReference = "";
+        paymentSearchError = null;
+
+        // Tabelle neu laden
         await LoadInvoices();
+
+        StateHasChanged();
+    }
+
+    // ZAHLUNGS-POPUP SCHLIESSEN
+
+    private void ClosePaymentModal()
+    {
+        showPaymentModal = false;
+
+        paymentInvoice = null;
     }
 
 
@@ -942,5 +1341,252 @@ else
             _ =>
                 "-"
         };
+    }
+
+    // =========================================================
+    // BUCHHALTUNG EXCELEXPORT
+    // =========================================================
+
+    private async Task<bool> IsAdmin()
+    {
+        var authState =
+            await AuthenticationStateProvider
+                .GetAuthenticationStateAsync();
+
+        return authState.User.IsInRole("Admin");
+    }
+
+
+    private async Task ExportAccountingExcel()
+    {
+        if (!await IsAdmin())
+            return;
+
+        await using var Db =
+            await DbFactory.CreateDbContextAsync();
+
+        var yearInvoices = await Db.Invoices
+            .AsNoTracking()
+            .Include(x => x.ParentUser)
+            .Where(x => x.CreatedAt.Year == AccountingYear)
+            .OrderBy(x => x.CreatedAt)
+            .ToListAsync();
+
+        var invoiceIds = yearInvoices
+            .Select(x => x.Id)
+            .ToList();
+
+        var refunds = await Db.RefundRequests
+            .AsNoTracking()
+            .Where(x =>
+                invoiceIds.Contains(x.InvoiceId) &&
+                x.IsRefundet)
+            .ToListAsync();
+
+
+        using var workbook = new XLWorkbook();
+
+        var worksheet =
+            workbook.Worksheets.Add("Buchhaltung");
+
+
+        // =====================================================
+        // ZUSAMMENFASSUNG
+        // =====================================================
+
+        var total =
+            yearInvoices.Sum(x => x.TotalAmount);
+
+        var outstanding =
+            yearInvoices
+                .Where(x =>
+                    x.Status == InvoiceStatus.Open ||
+                    x.Status == InvoiceStatus.Reminder)
+                .Sum(x => x.TotalAmount);
+
+        decimal refunded =
+            refunds.Sum(x => (decimal) (x.Amount ?? 0));
+
+        var paid =
+            yearInvoices
+                .Where(x =>
+                    x.Status == InvoiceStatus.Paid ||
+                    x.Status == InvoiceStatus.PartlyRefundet ||
+                    x.Status == InvoiceStatus.Refunded)
+                .Sum(x => x.TotalAmount);
+
+        var netPaid =
+            paid - refunded;
+
+
+        worksheet.Cell(1, 1).Value =
+            $"Buchhaltung {AccountingYear}";
+
+        worksheet.Cell(3, 1).Value =
+            "Total Rechnungen";
+
+        worksheet.Cell(3, 2).Value =
+            total;
+
+
+        worksheet.Cell(4, 1).Value =
+            "Noch geschuldet";
+
+        worksheet.Cell(4, 2).Value =
+            outstanding;
+
+
+        worksheet.Cell(5, 1).Value =
+            "Rückerstattet";
+
+        worksheet.Cell(5, 2).Value =
+            refunded;
+
+
+        worksheet.Cell(6, 1).Value =
+            "Netto bezahlt";
+
+        worksheet.Cell(6, 2).Value =
+            netPaid;
+
+
+        worksheet.Range("B3:B6")
+            .Style.NumberFormat.Format =
+            "CHF #,##0.00";
+
+
+        // =====================================================
+        // DETAILTABELLE
+        // =====================================================
+
+        worksheet.Cell(8, 1).Value = "Datum";
+        worksheet.Cell(8, 2).Value = "Referenz";
+        worksheet.Cell(8, 3).Value = "Familie";
+        worksheet.Cell(8, 4).Value = "E-Mail";
+        worksheet.Cell(8, 5).Value = "Rechnung";
+        worksheet.Cell(8, 6).Value = "Status";
+        worksheet.Cell(8, 7).Value = "Geschuldet";
+        worksheet.Cell(8, 8).Value = "Bezahlt";
+        worksheet.Cell(8, 9).Value = "Rückerstattet";
+        worksheet.Cell(8, 10).Value = "Netto bezahlt";
+
+
+        int row = 9;
+
+        foreach (var invoice in yearInvoices)
+        {
+            decimal invoiceRefunded =
+    refunds
+        .Where(x => x.InvoiceId == invoice.Id)
+        .Sum(x => (decimal)(x.Amount ?? 0));
+
+            bool isOutstanding =
+                invoice.Status == InvoiceStatus.Open ||
+                invoice.Status == InvoiceStatus.Reminder;
+
+            decimal outstandingAmount =
+                isOutstanding
+                    ? invoice.TotalAmount
+                    : 0m;
+
+            bool isPaid =
+                invoice.Status == InvoiceStatus.Paid ||
+                invoice.Status == InvoiceStatus.PartlyRefundet ||
+                invoice.Status == InvoiceStatus.Refunded;
+
+            decimal paidAmount =
+                isPaid
+                    ? invoice.TotalAmount
+                    : 0m;
+
+            decimal netAmount =
+                paidAmount - invoiceRefunded;
+
+
+            worksheet.Cell(row, 1).Value =
+                invoice.CreatedAt;
+
+            worksheet.Cell(row, 1)
+                .Style.DateFormat.Format =
+                "dd.MM.yyyy";
+
+
+            worksheet.Cell(row, 2).Value =
+                invoice.Reference;
+
+
+            worksheet.Cell(row, 3).Value =
+                invoice.ParentUser?.Nachname ?? "";
+
+
+            worksheet.Cell(row, 4).Value =
+                invoice.ParentUser?.Email ?? "";
+
+
+            worksheet.Cell(row, 5).Value =
+                invoice.TotalAmount;
+
+
+            worksheet.Cell(row, 6).Value =
+                GetText(invoice.Status);
+
+
+            worksheet.Cell(row, 7).Value =
+                outstandingAmount;
+
+            worksheet.Cell(row, 8).Value =
+                paidAmount;
+
+            worksheet.Cell(row, 9).Value =
+                invoiceRefunded;
+
+            worksheet.Cell(row, 10).Value =
+                netAmount;
+
+            worksheet.Range(row, 5, row, 10)
+                .Style.NumberFormat.Format =
+                "CHF #,##0.00";
+
+            row++;
+        }
+
+
+        // =====================================================
+        // FORMATIERUNG
+        // =====================================================
+
+        worksheet.Row(1)
+            .Style.Font.Bold = true;
+
+        worksheet.Row(8)
+            .Style.Font.Bold = true;
+
+        worksheet.Columns()
+            .AdjustToContents();
+
+
+        // =====================================================
+        // DOWNLOAD
+        // =====================================================
+
+        using var stream =
+            new MemoryStream();
+
+        workbook.SaveAs(stream);
+
+        stream.Position = 0;
+
+        var fileName =
+            $"Buchhaltung_{AccountingYear}.xlsx";
+
+
+        using var streamRef =
+            new DotNetStreamReference(stream);
+
+
+        await JS.InvokeVoidAsync(
+            "downloadFileFromStream",
+            fileName,
+            streamRef);
     }
 }
