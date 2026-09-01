@@ -114,14 +114,20 @@
         <span>Bestätigt: @GetCount(ev.Id, EnrollmentStatus.Confirmed)</span><br />
         <span>Warteliste: @GetCount(ev.Id, EnrollmentStatus.WaitingList)</span><br /><br />
 
-        <button @onclick="() => GoDetails(ev.Id)">Details</button>
-        <button @onclick="() => GoEdit(ev.Id)">Bearbeiten</button>
+        <a class="btn btn-primary"
+           href="@($"/kursleiter/events/{ev.Id}")">
+            Details
+        </a>
+        <a class="btn btn-warning"
+           href="@($"/kursleiter/events/edit/{ev.Id}")">
+            Bearbeiten
+        </a>
 
         @if (ev.EndeZeit < DateTime.Now)
         {
             <br />
             <br />
-            <button style="color:red !important;"
+            <button class="btn btn-danger"
                     @onclick="() => ResetEvent(ev.Id)">
                 Anmeldungen zurücksetzen
             </button>
@@ -344,23 +350,6 @@
             x.EventId == eventId &&
             x.Status == status);
     }
-
-
-    // =========================================================
-    // NAVIGATION
-    // =========================================================
-
-    void GoDetails(int id)
-    {
-        Nav.NavigateTo($"/kursleiter/events/{id}");
-    }
-
-
-    void GoEdit(int id)
-    {
-        Nav.NavigateTo($"/kursleiter/events/edit/{id}");
-    }
-
 
     // =========================================================
     // EVENT ZURÜCKSETZEN
