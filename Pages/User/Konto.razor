@@ -24,22 +24,40 @@ else
     <div style="display:flex; flex-direction:column; gap:8px; max-width:400px;">
 
         <label>Vorname</label>
-        <input @bind="user.Vorname" />
+        <input class="form-control"
+               placeholder="Vornname"
+               @bind="user.Vorname"
+               @bind:event="oninput" />
 
         <label>Nachname</label>
-        <input @bind="user.Nachname" />
+        <input class="form-control"
+               placeholder="Nachname"
+               @bind="user.Nachname"
+               @bind:event="oninput" />
 
         <label>Strasse</label>
-        <input @bind="user.Strasse" />
+        <input class="form-control"
+               placeholder="Strasse"
+               @bind="user.Strasse"
+               @bind:event="oninput" />
 
         <label>PLZ</label>
-        <input @bind="user.PLZ" />
+        <input class="form-control"
+               placeholder="PLZ"
+               @bind="user.PLZ"
+               @bind:event="oninput" />
 
         <label>Ort</label>
-        <input @bind="user.Ort" />
+        <input class="form-control"
+               placeholder="Ort"
+               @bind="user.Ort"
+               @bind:event="oninput" />
 
         <label>Telefonnummer</label>
-        <input @bind="user.Telefonnummer" />
+        <input class="form-control"
+               placeholder="Telefonnummer"
+               @bind="user.Telefonnummer"
+               @bind:event="oninput" />
 
         <button style="height:30px; font-size:15px; line-height:5px;" class="btn btn-primary" @onclick="Save">Speichern</button>
 
@@ -52,11 +70,22 @@ else
     <hr />
     <h4>Notfallkontakte</h4>
 
-    <div style="margin-bottom:8px; gap:20px; display:flex;">
+    <div style="display:flex; flex-direction:column; gap:8px; max-width:400px;">
 
-        <input placeholder="Name" @bind="newContact.Name" />
-        <input placeholder="Telefon" @bind="newContact.Telefon" />
-        <input placeholder="Beziehung" @bind="newContact.Beziehung" />
+        <input class="form-control"
+               placeholder="Name"
+               @bind="newContact.Name"
+               @bind:event="oninput" />
+
+        <input class="form-control"
+               placeholder="Telefon"
+               @bind="newContact.Telefon"
+               @bind:event="oninput" />
+
+        <input class="form-control"
+               placeholder="Beziehung"
+               @bind="newContact.Beziehung"
+               @bind:event="oninput" />
 
         <button style="height:30px; font-size:15px; line-height:5px;" class="btn btn-primary" @onclick="AddContact">Hinzufügen</button>
 
