@@ -12,6 +12,96 @@
 
 <h3>Event Verwaltung</h3>
 
+@* =========================================================
+   FILTER
+   ========================================================= *@
+
+<div class="card mb-4">
+    <div class="card-body">
+
+        <h5 class="card-title mb-3">
+            Events filtern
+        </h5>
+
+        <div class="row g-3">
+
+            @* Jahr *@
+            <div class="col-md-4">
+
+                <label class="form-label">
+                    Jahr
+                </label>
+
+                <select class="form-select"
+                        @bind="FilterYear"
+                        @bind:after="ResetToFirstPage">
+
+                    <option value="">
+                        Alle Jahre
+                    </option>
+
+                    @foreach (var year in AvailableYears)
+                    {
+                        <option value="@year">
+                            @year
+                        </option>
+                    }
+
+                </select>
+
+            </div>
+
+
+            @* Kursleiter *@
+            <div class="col-md-4">
+
+                <label class="form-label">
+                    Kursleiter
+                </label>
+
+                <input class="form-control"
+                       placeholder="Nach Kursleiter suchen..."
+                       @bind="FilterKursleiter"
+                       @bind:event="oninput"
+                       @bind:after="ResetToFirstPage" />
+
+            </div>
+
+
+            @* Titel *@
+            <div class="col-md-4">
+
+                <label class="form-label">
+                    Titel
+                </label>
+
+                <input class="form-control"
+                       placeholder="Nach Titel suchen..."
+                       @bind="FilterTitle"
+                       @bind:event="oninput"
+                       @bind:after="ResetToFirstPage" />
+
+            </div>
+
+        </div>
+
+
+        <div class="mt-3">
+
+            <button class="btn btn-outline-secondary"
+                    @onclick="ResetFilters">
+                Filter zurücksetzen
+            </button>
+
+            <span class="ms-3 text-muted">
+                @filteredEvents.Count Event(s) gefunden
+            </span>
+
+        </div>
+
+    </div>
+</div>
+
 @foreach (var ev in pagedEvents)
 {
     <div style="border:1px solid #ccc; padding:10px; margin-bottom:10px;">
@@ -71,41 +161,140 @@
 @code {
     private List<Event> events = new();
 
+    private string FilterYear = "";
+    private string FilterKursleiter = "";
+    private string FilterTitle = "";
+
     private int currentPage = 1;
     private const int pageSize = 20;
 
-    private List<Event> pagedEvents =>
+
+    // =========================================================
+    // FILTER
+    // =========================================================
+
+    private List<int> AvailableYears =>
         events
+            .Where(x => x.StartZeit.HasValue)
+            .Select(x => x.StartZeit!.Value.Year)
+            .Distinct()
+            .OrderByDescending(x => x)
+            .ToList();
+
+
+    private List<Event> filteredEvents =>
+        events
+            .Where(x =>
+                string.IsNullOrWhiteSpace(FilterYear)
+                ||
+                (
+                    x.StartZeit.HasValue &&
+                    x.StartZeit.Value.Year.ToString() == FilterYear
+                )
+            )
+            .Where(x =>
+                string.IsNullOrWhiteSpace(FilterTitle)
+                ||
+                (
+                    !string.IsNullOrWhiteSpace(x.Eventname) &&
+                    x.Eventname.Contains(
+                        FilterTitle,
+                        StringComparison.OrdinalIgnoreCase)
+                )
+            )
+            .Where(x =>
+                string.IsNullOrWhiteSpace(FilterKursleiter)
+                ||
+                (
+                    x.Kursleiter != null &&
+                    x.Kursleiter.Any(k =>
+                        k.User != null &&
+                        (
+                            (k.User.Vorname ?? "")
+                                .Contains(
+                                    FilterKursleiter,
+                                    StringComparison.OrdinalIgnoreCase)
+
+                            ||
+
+                            (k.User.Nachname ?? "")
+                                .Contains(
+                                    FilterKursleiter,
+                                    StringComparison.OrdinalIgnoreCase)
+
+                            ||
+
+                            ($"{k.User.Vorname} {k.User.Nachname}")
+                                .Contains(
+                                    FilterKursleiter,
+                                    StringComparison.OrdinalIgnoreCase)
+                        )
+                    )
+                )
+            )
+            .ToList();
+
+
+    // =========================================================
+    // PAGINATION
+    // =========================================================
+
+    private List<Event> pagedEvents =>
+        filteredEvents
             .Skip((currentPage - 1) * pageSize)
             .Take(pageSize)
             .ToList();
 
+
     private int totalPages =>
-        (int)Math.Ceiling(events.Count / (double)pageSize);
+        (int)Math.Ceiling(
+            filteredEvents.Count / (double)pageSize);
+
+
+    // =========================================================
+    // INITIALISIERUNG
+    // =========================================================
 
     protected override void OnInitialized()
     {
         LoadEvents();
     }
 
+
+    // =========================================================
+    // EVENTS LADEN
+    // =========================================================
+
     void LoadEvents()
     {
         using var Db = DbFactory.CreateDbContext();
+
         events = Db.Events
+            .Include(x => x.Kursleiter)
+                .ThenInclude(x => x.User)
             .Where(x => !x.IsDeleted)
             .OrderByDescending(x => x.StartZeit)
             .ToList();
 
         if (currentPage > totalPages)
         {
-            currentPage = totalPages == 0 ? 1 : totalPages;
+            currentPage =
+                totalPages == 0
+                    ? 1
+                    : totalPages;
         }
     }
+
+
+    // =========================================================
+    // SEITENWECHSEL
+    // =========================================================
 
     void GoToPage(int pageNumber)
     {
         currentPage = pageNumber;
     }
+
 
     void NextPage()
     {
@@ -113,11 +302,39 @@
             currentPage++;
     }
 
+
     void PreviousPage()
     {
         if (currentPage > 1)
             currentPage--;
     }
+
+
+    // =========================================================
+    // FILTER
+    // =========================================================
+
+    private Task ResetToFirstPage()
+    {
+        currentPage = 1;
+
+        return Task.CompletedTask;
+    }
+
+
+    private void ResetFilters()
+    {
+        FilterYear = "";
+        FilterKursleiter = "";
+        FilterTitle = "";
+
+        currentPage = 1;
+    }
+
+
+    // =========================================================
+    // ANMELDUNGEN ZÄHLEN
+    // =========================================================
 
     int GetCount(int eventId, EnrollmentStatus status)
     {
@@ -128,33 +345,53 @@
             x.Status == status);
     }
 
+
+    // =========================================================
+    // NAVIGATION
+    // =========================================================
+
     void GoDetails(int id)
     {
         Nav.NavigateTo($"/kursleiter/events/{id}");
     }
+
 
     void GoEdit(int id)
     {
         Nav.NavigateTo($"/kursleiter/events/edit/{id}");
     }
 
+
+    // =========================================================
+    // EVENT ZURÜCKSETZEN
+    // =========================================================
+
     void ResetEvent(int eventId)
     {
         using var Db = DbFactory.CreateDbContext();
-        var ev = Db.Events.FirstOrDefault(x => x.Id == eventId);
 
-        if (ev == null || ev.EndeZeit >= DateTime.Now)
+        var ev = Db.Events
+            .FirstOrDefault(x => x.Id == eventId);
+
+        if (ev == null ||
+            ev.EndeZeit >= DateTime.Now)
+        {
             return;
+        }
 
-        var registrations = Db.EventChildren
-            .Where(x => x.EventId == eventId)
-            .ToList();
+        var registrations =
+            Db.EventChildren
+                .Where(x =>
+                    x.EventId == eventId)
+                .ToList();
 
-        Db.EventChildren.RemoveRange(registrations);
+        Db.EventChildren.RemoveRange(
+            registrations);
 
         Db.SaveChanges();
 
         LoadEvents();
+
         StateHasChanged();
     }
 }
