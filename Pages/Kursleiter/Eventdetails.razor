@@ -8,9 +8,10 @@
 @using Microsoft.AspNetCore.Components
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.JSInterop
-@using System.Net
-@using System.Net.Mail
 @using System.Text
+@using MailKit.Net.Smtp
+@using MailKit.Security
+@using MimeKit
 
 @attribute [Authorize(Roles = "Admin,Kursleiter")]
 
@@ -1043,16 +1044,10 @@ else
                             courseLeaderText);
 
 
-                    var mailto =
-                        "mailto:" +
-                        Uri.EscapeDataString(recipient.Email) +
-                        $"?subject={Uri.EscapeDataString(subject)}" +
-                        $"&body={Uri.EscapeDataString(body)}";
-
-                    await JS.InvokeVoidAsync(
-                        "open",
-                        mailto,
-                        "_blank");
+                    await SendSmtpMailAsync(
+                        recipient.Email,
+                        subject,
+                        body);
 
                     sent++;
                 }
@@ -1399,9 +1394,9 @@ else
 
 
     private async Task SendSmtpMailAsync(
-    string recipient,
-    string subject,
-    string body)
+        string recipient,
+        string subject,
+        string body)
     {
         var host =
             Configuration["Email:Smtp"];
@@ -1415,6 +1410,9 @@ else
         var from =
             Configuration["Email:From"];
 
+        var security =
+            Configuration["Email:Security"];
+
         var port =
             int.TryParse(
                 Configuration["Email:Port"],
@@ -1424,35 +1422,102 @@ else
 
         if (string.IsNullOrWhiteSpace(host))
             throw new InvalidOperationException(
-                "SMTP-Server fehlt in der Konfiguration.");
+                "SMTP-Server fehlt.");
 
         if (string.IsNullOrWhiteSpace(from))
             throw new InvalidOperationException(
-                "SMTP-Absender fehlt in der Konfiguration.");
+                "SMTP-Absender fehlt.");
 
-        using var message = new MailMessage();
+        if (string.IsNullOrWhiteSpace(username))
+            throw new InvalidOperationException(
+                "SMTP-Benutzername fehlt.");
 
-        message.From =
-            new MailAddress(
-                from,
-                "Ferienspass");
+        if (string.IsNullOrWhiteSpace(password))
+            throw new InvalidOperationException(
+                "SMTP-Passwort fehlt.");
 
-        message.To.Add(recipient);
+        var socketOptions =
+            security?.ToLowerInvariant() switch
+            {
+                "sslonconnect" =>
+                    SecureSocketOptions.SslOnConnect,
+
+                "starttls" =>
+                    SecureSocketOptions.StartTls,
+
+                "starttlswhenavailable" =>
+                    SecureSocketOptions.StartTlsWhenAvailable,
+
+                "none" =>
+                    SecureSocketOptions.None,
+
+                _ =>
+                    SecureSocketOptions.StartTls
+            };
+
+        var message = new MimeMessage();
+
+        message.From.Add(
+            new MailboxAddress(
+                "Ferienspass",
+                from));
+
+        message.To.Add(
+            MailboxAddress.Parse(recipient));
+
         message.Subject = subject;
-        message.Body = body;
-        message.IsBodyHtml = false;
+
+        message.Body =
+            new TextPart("plain")
+                {
+                    Text = body
+                };
 
         using var client =
-            new SmtpClient(host, port);
+            new MailKit.Net.Smtp.SmtpClient();
 
-        client.EnableSsl = true;
+        client.CheckCertificateRevocation = false;
 
-        client.Credentials =
-            new NetworkCredential(
+        // 15 Sekunden statt unendlich warten
+        client.Timeout = 15000;
+
+        Console.WriteLine(
+            $"SMTP: Verbinde mit {host}:{port}");
+
+        Console.WriteLine(
+            $"SMTP: Sicherheitsmodus = {socketOptions}");
+
+        try
+        {
+            await client.ConnectAsync(
+                host,
+                port,
+                socketOptions);
+
+            Console.WriteLine(
+                "SMTP: Verbindung hergestellt.");
+
+            await client.AuthenticateAsync(
                 username,
                 password);
 
-        await client.SendMailAsync(message);
+            Console.WriteLine(
+                "SMTP: Anmeldung erfolgreich.");
+
+            await client.SendAsync(message);
+
+            Console.WriteLine(
+                $"SMTP: E-Mail an {recipient} versendet.");
+
+            await client.DisconnectAsync(true);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(
+                $"SMTP FEHLER: {ex}");
+
+            throw;
+        }
     }
 
 
@@ -1552,21 +1617,13 @@ else
             kursleiterText;
 
 
-        var recipientString =
-            string.Join(",", recipients);
-
-
-        var mailto =
-            "mailto:" +
-            $"?bcc={Uri.EscapeDataString(recipientString)}" +
-            $"&subject={Uri.EscapeDataString(subject)}" +
-            $"&body={Uri.EscapeDataString(body)}";
-
-
-        await JS.InvokeVoidAsync(
-            "open",
-            mailto,
-            "_self");
+        foreach (var recipient in recipients)
+        {
+            await SendSmtpMailAsync(
+                recipient!,
+                subject,
+                body);
+        }
     }
 
 
@@ -1910,4 +1967,5 @@ else
             x.EventId == eventId &&
             x.Status == status);
     }
+
 }
