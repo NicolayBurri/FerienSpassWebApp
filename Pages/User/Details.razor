@@ -1,0 +1,673 @@
+﻿@page "/user/details"
+
+@using System.Security.Claims
+@using FerienspassWebApp.Data
+@using FerienspassWebApp.Models
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.EntityFrameworkCore
+
+@attribute [Authorize]
+
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<h1>Anmeldungen und Einsätze</h1>
+
+@if (isLoading)
+{
+    <p>Lade Daten...</p>
+}
+else
+{
+    @* =========================================================
+       JAHRES-TABS
+       ========================================================= *@
+
+    @if (availableYears.Any())
+    {
+        <div style="
+            display:flex;
+            gap:8px;
+            flex-wrap:wrap;
+            margin-bottom:20px;">
+
+            @foreach (var year in availableYears)
+            {
+                var currentYear = year;
+
+                <button class="btn @(selectedYear == currentYear ? "btn-primary" : "btn-outline-primary")"
+                        @onclick="() => SelectYear(currentYear)">
+                    @currentYear
+                </button>
+            }
+        </div>
+    }
+
+
+    @* =========================================================
+       FILTER
+       ========================================================= *@
+
+    <div style="
+        border:1px solid #ddd;
+        border-radius:8px;
+        padding:15px;
+        margin-bottom:25px;">
+
+        <h5>Filter</h5>
+
+        <div style="
+            display:flex;
+            gap:15px;
+            flex-wrap:wrap;
+            align-items:end;">
+
+            <div>
+                <label style="display:block; margin-bottom:5px;">
+                    Name
+                </label>
+
+                <input class="form-control"
+                       style="min-width:250px;"
+                       placeholder="Event oder Kind suchen"
+                       @bind="searchName"
+                       @bind:event="oninput" />
+            </div>
+
+            <div>
+                <label style="display:block; margin-bottom:5px;">
+                    Datum
+                </label>
+
+                <input type="date"
+                       class="form-control"
+                       @bind="selectedDate" />
+            </div>
+
+            <div>
+                <button class="btn btn-secondary"
+                        @onclick="ResetFilters">
+                    Filter zurücksetzen
+                </button>
+            </div>
+        </div>
+    </div>
+
+
+    @* =========================================================
+       ZUSAMMENFASSUNG
+       ========================================================= *@
+
+    <div style="
+        display:flex;
+        gap:15px;
+        flex-wrap:wrap;
+        margin-bottom:25px;">
+
+        <div style="
+            border:1px solid #ddd;
+            border-radius:8px;
+            padding:15px;
+            min-width:180px;">
+
+            <b>Anmeldungen</b>
+
+            <div style="font-size:28px;">
+                @filteredRegistrations.Count
+            </div>
+        </div>
+
+        <div style="
+            border:1px solid #ddd;
+            border-radius:8px;
+            padding:15px;
+            min-width:180px;">
+
+            <b>Fahrdienste</b>
+
+            <div style="font-size:28px;">
+                @filteredDriverAssignments.Count
+            </div>
+        </div>
+
+        <div style="
+            border:1px solid #ddd;
+            border-radius:8px;
+            padding:15px;
+            min-width:180px;">
+
+            <b>Betreuungseinsätze</b>
+
+            <div style="font-size:28px;">
+                @filteredHelperAssignments.Count
+            </div>
+        </div>
+    </div>
+
+
+    @* =========================================================
+       ANMELDUNGEN
+       ========================================================= *@
+
+    <h3>Anmeldungen @selectedYear</h3>
+
+    @if (filteredRegistrations.Any())
+    {
+        @foreach (var registration in filteredRegistrations)
+        {
+            <div style="
+                border:1px solid #ddd;
+                border-radius:8px;
+                padding:15px;
+                margin-bottom:12px;">
+
+                <h5 style="margin-bottom:10px;">
+                    @registration.Event.Eventname
+                </h5>
+
+                <b>Kind:</b>
+                @registration.Child.Name
+                <br />
+
+                <b>Datum:</b>
+                @FormatDateTime(registration.Event.StartZeit)
+
+                @if (registration.Event.EndeZeit != null)
+                {
+                    <span>
+                        -
+                        @registration.Event.EndeZeit?.ToString("dd.MM.yyyy HH:mm")
+                    </span>
+                }
+
+                <br />
+
+                <b>Ort:</b>
+                @(registration.Event.Location ?? "-")
+                <br />
+
+                <b>Status:</b>
+
+                <span style="
+                    font-weight:bold;
+                    color:@GetEnrollmentColor(registration.Status);">
+
+                    @GetEnrollmentText(registration.Status)
+                </span>
+
+                <br />
+
+                <b>Angemeldet am:</b>
+                @registration.RegisteredAt.ToString("dd.MM.yyyy HH:mm")
+            </div>
+        }
+    }
+    else
+    {
+        <p>
+            Für die gewählten Filter wurden keine Anmeldungen gefunden.
+        </p>
+    }
+
+
+    <hr />
+
+
+    @* =========================================================
+       FAHRDIENSTE
+       ========================================================= *@
+
+    <h3>Meine Fahrdienste @selectedYear</h3>
+
+    @if (filteredDriverAssignments.Any())
+    {
+        @foreach (var driver in filteredDriverAssignments)
+        {
+            <div style="
+                border:1px solid #ddd;
+                border-radius:8px;
+                padding:15px;
+                margin-bottom:12px;">
+
+                <h5 style="margin-bottom:10px;">
+                    @driver.Event.Eventname
+                </h5>
+
+                <b>Datum:</b>
+                @FormatDateTime(driver.Event.StartZeit)
+
+                @if (driver.Event.EndeZeit != null)
+                {
+                    <span>
+                        -
+                        @driver.Event.EndeZeit?.ToString("dd.MM.yyyy HH:mm")
+                    </span>
+                }
+
+                <br />
+
+                <b>Ort:</b>
+                @(driver.Event.Location ?? "-")
+                <br />
+
+                <b>Sitzplätze:</b>
+                @(driver.Seats ?? 0)
+
+                @if ((driver.Seats ?? 0) == 1)
+                {
+                    <span>Sitzplatz</span>
+                }
+                else
+                {
+                    <span>Sitzplätze</span>
+                }
+            </div>
+        }
+    }
+    else
+    {
+        <p>
+            Für die gewählten Filter wurden keine Fahrdienste gefunden.
+        </p>
+    }
+
+
+    <hr />
+
+
+    @* =========================================================
+       BETREUUNG
+       ========================================================= *@
+
+    <h3>Meine Betreuungseinsätze @selectedYear</h3>
+
+    @if (filteredHelperAssignments.Any())
+    {
+        @foreach (var helperPerson in filteredHelperAssignments)
+        {
+            <div style="
+                border:1px solid #ddd;
+                border-radius:8px;
+                padding:15px;
+                margin-bottom:12px;">
+
+                <h5 style="margin-bottom:10px;">
+                    @helperPerson.Event.Eventname
+                </h5>
+
+                <b>Datum:</b>
+                @FormatDateTime(helperPerson.Event.StartZeit)
+
+                @if (helperPerson.Event.EndeZeit != null)
+                {
+                    <span>
+                        -
+                        @helperPerson.Event.EndeZeit?.ToString("dd.MM.yyyy HH:mm")
+                    </span>
+                }
+
+                <br />
+
+                <b>Ort:</b>
+                @(helperPerson.Event.Location ?? "-")
+
+                <br />
+
+                <b>Einsatz:</b>
+                Betreuungsperson
+            </div>
+        }
+    }
+    else
+    {
+        <p>
+            Für die gewählten Filter wurden keine Betreuungseinsätze gefunden.
+        </p>
+    }
+}
+
+
+@code {
+
+    private bool isLoading = true;
+
+    private string? currentUserId;
+
+
+    // =========================================================
+    // ORIGINALDATEN
+    // =========================================================
+
+    private List<EventChild> registrations = new();
+
+    private List<EventRoleAssignment> driverAssignments = new();
+
+    private List<EventRoleAssignment> helperAssignments = new();
+
+
+    // =========================================================
+    // FILTER
+    // =========================================================
+
+    private string searchName = "";
+
+    private DateTime? selectedDate;
+
+    private int selectedYear;
+
+    private List<int> availableYears = new();
+
+
+    // =========================================================
+    // GEFILTERTE ANMELDUNGEN
+    // =========================================================
+
+    private List<EventChild> filteredRegistrations =>
+        registrations
+            .Where(x =>
+                x.Event.StartZeit?.Year == selectedYear)
+            .Where(x =>
+                MatchesName(
+                    x.Event.Eventname,
+                    x.Child.Name))
+            .Where(x =>
+                MatchesDate(x.Event.StartZeit))
+            .OrderByDescending(x =>
+                x.Event.StartZeit)
+            .ToList();
+
+
+    // =========================================================
+    // GEFILTERTE FAHRDIENSTE
+    // =========================================================
+
+    private List<EventRoleAssignment> filteredDriverAssignments =>
+        driverAssignments
+            .Where(x =>
+                x.Event.StartZeit?.Year == selectedYear)
+            .Where(x =>
+                MatchesName(
+                    x.Event.Eventname))
+            .Where(x =>
+                MatchesDate(x.Event.StartZeit))
+            .OrderByDescending(x =>
+                x.Event.StartZeit)
+            .ToList();
+
+
+    // =========================================================
+    // GEFILTERTE BETREUUNGSEINSÄTZE
+    // =========================================================
+
+    private List<EventRoleAssignment> filteredHelperAssignments =>
+        helperAssignments
+            .Where(x =>
+                x.Event.StartZeit?.Year == selectedYear)
+            .Where(x =>
+                MatchesName(
+                    x.Event.Eventname))
+            .Where(x =>
+                MatchesDate(x.Event.StartZeit))
+            .OrderByDescending(x =>
+                x.Event.StartZeit)
+            .ToList();
+
+
+    // =========================================================
+    // INITIALISIERUNG
+    // =========================================================
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+
+    // =========================================================
+    // DATEN LADEN
+    // =========================================================
+
+    private async Task LoadData()
+    {
+        isLoading = true;
+
+        try
+        {
+            var authState =
+                await AuthenticationStateProvider
+                    .GetAuthenticationStateAsync();
+
+            var user = authState.User;
+
+            currentUserId =
+                user.FindFirstValue(
+                    ClaimTypes.NameIdentifier);
+
+
+            if (string.IsNullOrWhiteSpace(currentUserId))
+            {
+                return;
+            }
+
+
+            await using var Db =
+                await DbFactory.CreateDbContextAsync();
+
+
+            // =================================================
+            // ANMELDUNGEN DER EIGENEN KINDER
+            // =================================================
+
+            registrations =
+                await Db.EventChildren
+                    .AsNoTracking()
+                    .Include(x => x.Child)
+                    .Include(x => x.Event)
+                    .Where(x =>
+                        x.Child.ParentUserId == currentUserId)
+                    .OrderByDescending(x =>
+                        x.Event.StartZeit)
+                    .ToListAsync();
+
+
+            // =================================================
+            // EIGENE FAHRDIENSTE
+            // =================================================
+
+            driverAssignments =
+                await Db.EventRoleAssignments
+                    .AsNoTracking()
+                    .Include(x => x.Event)
+                    .Where(x =>
+                        x.UserId == currentUserId &&
+                        x.Role == RoleType.Driver)
+                    .OrderByDescending(x =>
+                        x.Event.StartZeit)
+                    .ToListAsync();
+
+
+            // =================================================
+            // EIGENE BETREUUNGSEINSÄTZE
+            // =================================================
+
+            helperAssignments =
+                await Db.EventRoleAssignments
+                    .AsNoTracking()
+                    .Include(x => x.Event)
+                    .Where(x =>
+                        x.UserId == currentUserId &&
+                        x.Role == RoleType.Helper)
+                    .OrderByDescending(x =>
+                        x.Event.StartZeit)
+                    .ToListAsync();
+
+
+            // =================================================
+            // VERFÜGBARE JAHRE ERMITTELN
+            // =================================================
+
+            availableYears =
+                registrations
+                    .Select(x => x.Event.StartZeit?.Year)
+                    .Concat(
+                        driverAssignments
+                            .Select(x => x.Event.StartZeit?.Year))
+                    .Concat(
+                        helperAssignments
+                            .Select(x => x.Event.StartZeit?.Year))
+                    .Where(x => x.HasValue)
+                    .Select(x => x!.Value)
+                    .Distinct()
+                    .OrderByDescending(x => x)
+                    .ToList();
+
+
+            // =================================================
+            // STANDARD-JAHR AUSWÄHLEN
+            // =================================================
+
+            if (availableYears.Contains(DateTime.Now.Year))
+            {
+                selectedYear = DateTime.Now.Year;
+            }
+            else if (availableYears.Any())
+            {
+                selectedYear = availableYears.First();
+            }
+            else
+            {
+                selectedYear = DateTime.Now.Year;
+            }
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+
+    // =========================================================
+    // JAHR AUSWÄHLEN
+    // =========================================================
+
+    private void SelectYear(int year)
+    {
+        selectedYear = year;
+
+        // Datum zurücksetzen, da ein Datum aus einem anderen
+        // Jahr sonst alle Resultate ausblenden könnte.
+        selectedDate = null;
+    }
+
+
+    // =========================================================
+    // NAMENSFILTER
+    // =========================================================
+
+    private bool MatchesName(params string?[] values)
+    {
+        if (string.IsNullOrWhiteSpace(searchName))
+        {
+            return true;
+        }
+
+
+        var search =
+            searchName.Trim();
+
+
+        return values.Any(value =>
+            !string.IsNullOrWhiteSpace(value) &&
+            value.Contains(
+                search,
+                StringComparison.OrdinalIgnoreCase));
+    }
+
+
+    // =========================================================
+    // DATUMSFILTER
+    // =========================================================
+
+    private bool MatchesDate(DateTime? eventDate)
+    {
+        if (!selectedDate.HasValue)
+        {
+            return true;
+        }
+
+
+        if (!eventDate.HasValue)
+        {
+            return false;
+        }
+
+
+        return eventDate.Value.Date ==
+               selectedDate.Value.Date;
+    }
+
+
+    // =========================================================
+    // FILTER ZURÜCKSETZEN
+    // =========================================================
+
+    private void ResetFilters()
+    {
+        searchName = "";
+        selectedDate = null;
+    }
+
+
+    // =========================================================
+    // DATUM FORMATIEREN
+    // =========================================================
+
+    private string FormatDateTime(DateTime? value)
+    {
+        return value?.ToString("dd.MM.yyyy HH:mm")
+               ?? "-";
+    }
+
+
+    // =========================================================
+    // STATUS TEXT
+    // =========================================================
+
+    private string GetEnrollmentText(
+        EnrollmentStatus status)
+    {
+        return status switch
+        {
+            EnrollmentStatus.Confirmed =>
+                "Bestätigt",
+
+            EnrollmentStatus.WaitingList =>
+                "Warteliste",
+
+            _ =>
+                status.ToString()
+        };
+    }
+
+
+    // =========================================================
+    // STATUS FARBE
+    // =========================================================
+
+    private string GetEnrollmentColor(
+        EnrollmentStatus status)
+    {
+        return status switch
+        {
+            EnrollmentStatus.Confirmed =>
+                "green",
+
+            EnrollmentStatus.WaitingList =>
+                "orange",
+
+            _ =>
+                "black"
+        };
+    }
+}
