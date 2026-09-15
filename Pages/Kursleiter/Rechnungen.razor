@@ -7,6 +7,7 @@
 @using ClosedXML.Excel
 @using Microsoft.JSInterop
 @using Microsoft.AspNetCore.Components
+@using System.Text
 
 @attribute [Authorize(Roles = "Admin,Kursleiter")]
 
@@ -411,6 +412,8 @@ else
 
                 <AuthorizeView Roles="Admin">
                     <th>Ändern</th>
+
+                    <th>Reminder schicken</th>
                 </AuthorizeView>
 
             </tr>
@@ -514,6 +517,32 @@ else
 
                         </td>
 
+                        <td>
+                            @if (invoice.Status == InvoiceStatus.Open ||
+                           invoice.Status == InvoiceStatus.Reminder)
+                            {
+                                @if (!string.IsNullOrWhiteSpace(invoice.ParentUser?.Email))
+                                {
+                                    <a class="btn btn-warning btn-sm"
+                                       href="@CreatePaymentReminderMailLink(invoice)">
+                                        Zahlungserinnerung
+                                    </a>
+                                }
+                                else
+                                {
+                                    <span class="text-muted">
+                                        Keine E-Mail-Adresse
+                                    </span>
+                                }
+                            }
+                            else
+                            {
+                                <span class="text-muted">
+                                    -
+                                </span>
+                            }
+                        </td>
+
                     </AuthorizeView>
 
                 </tr>
@@ -527,7 +556,7 @@ else
                 {
                     <tr>
 
-                        <td colspan="7"
+                        <td colspan="8"
                             style="
                                 background:#fff3cd;
                                 color:#842029;
@@ -1588,5 +1617,67 @@ else
             "downloadFileFromStream",
             fileName,
             streamRef);
+    }
+
+    // =====================================================
+    // Send remindermail
+    // =====================================================
+
+    private string CreatePaymentReminderMailLink(Invoice invoice)
+    {
+        var recipient =
+            invoice.ParentUser?.Email ?? "";
+
+        var subject =
+            Uri.EscapeDataString(
+                $"Zahlungserinnerung FerienSpass – Rechnung {invoice.Reference}");
+
+        var text = new StringBuilder();
+
+        text.AppendLine(
+            $"Guten Tag {invoice.ParentUser?.Vorname} {invoice.ParentUser?.Nachname}");
+        text.AppendLine();
+
+        text.AppendLine(
+            "Wir möchten Sie freundlich daran erinnern, dass die folgende Rechnung für den FerienSpass noch offen ist:");
+        text.AppendLine();
+
+        text.AppendLine(
+            $"Rechnungsdatum: {invoice.CreatedAt:dd.MM.yyyy}");
+
+        text.AppendLine(
+            $"Referenznummer: {invoice.Reference}");
+
+        text.AppendLine(
+            $"Betrag: CHF {invoice.TotalAmount:0.00}");
+
+        text.AppendLine();
+
+        text.AppendLine(
+            "Wir bitten Sie, den offenen Rechnungsbetrag zu bezahlen.");
+
+        text.AppendLine();
+
+        text.AppendLine(
+            "Falls Sie die Rechnung inzwischen bereits bezahlt haben, können Sie diese Nachricht selbstverständlich ignorieren.");
+
+        text.AppendLine();
+
+        text.AppendLine(
+            "Vielen Dank.");
+
+        text.AppendLine();
+
+        text.AppendLine(
+            "Freundliche Grüsse");
+
+        text.AppendLine(
+            "Euer FerienSpass Team");
+
+        var body =
+            Uri.EscapeDataString(text.ToString());
+
+        return
+            $"mailto:{recipient}?subject={subject}&body={body}";
     }
 }
