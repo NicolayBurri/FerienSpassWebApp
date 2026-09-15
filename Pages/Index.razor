@@ -110,15 +110,13 @@
                                             Datum:
                                         </strong>
 
-                                        @featuredEvent.StartZeit.Value
-                                        .ToString("dd.MM.yyyy")
+                                        @featuredEvent.StartZeit.Value.ToString("dd.MM.yyyy")
 
                                         @if (featuredEvent.StartZeit.HasValue)
                                         {
                                             <span>
                                                 um
-                                                @featuredEvent.StartZeit.Value
-                                                .ToString("HH:mm")
+                                                @featuredEvent.StartZeit.Value.ToString("HH:mm")
                                                 Uhr
                                             </span>
                                         }
@@ -270,28 +268,24 @@
                 {
                     <h4>
                         Anmeldungen ab:
-                        @settings.KursleiterStart?
-                        .ToString("dd.MM.yyyy HH:mm")
+                        @settings.KursleiterStart?.ToString("dd.MM.yyyy HH:mm")
                     </h4>
 
                     <h4>
                         Anmeldeschluss:
-                        @settings.KursleiterEnde?
-                        .ToString("dd.MM.yyyy HH:mm")
+                        @settings.KursleiterEnde?.ToString("dd.MM.yyyy HH:mm")
                     </h4>
                 }
                 else
                 {
                     <h4>
                         Anmeldungen ab:
-                        @settings.AnmeldungStart?
-                        .ToString("dd.MM.yyyy HH:mm")
+                        @settings.AnmeldungStart?.ToString("dd.MM.yyyy HH:mm")
                     </h4>
 
                     <h4>
                         Anmeldeschluss:
-                        @settings.AnmeldungEnde?
-                        .ToString("dd.MM.yyyy HH:mm")
+                        @settings.AnmeldungEnde?.ToString("dd.MM.yyyy HH:mm")
                     </h4>
                 }
 
