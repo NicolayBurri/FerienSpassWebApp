@@ -163,8 +163,39 @@ else
                 margin-bottom:12px;">
 
                 <h5 style="margin-bottom:10px;">
+
                     @registration.Event.Eventname
+
+                    @if (registration.Event.IsCancelled)
+                    {
+                        <span class="badge bg-danger ms-2">
+                            ABGESAGT
+                        </span>
+                    }
+
                 </h5>
+
+                @if (registration.Event.IsCancelled)
+                {
+                    <div class="alert alert-danger mb-3">
+
+                        <strong>
+                            Dieser Event wurde abgesagt.
+                        </strong>
+
+                        @if (registration.Event.CancelledAt.HasValue)
+                        {
+                            <br />
+
+                            <small>
+                                Abgesagt am
+                                @registration.Event.CancelledAt.Value.ToString(
+                                         "dd.MM.yyyy HH:mm")
+                            </small>
+                        }
+
+                    </div>
+                }
 
                 <b>Kind:</b>
                 @registration.Child.Name

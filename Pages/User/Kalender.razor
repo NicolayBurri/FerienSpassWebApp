@@ -113,7 +113,35 @@ else
 
                 <div class="event-content">
 
-                    <h3>Event: @ev.Eventname</h3><br />
+                    <h3>Event: @ev.Eventname
+
+                        @if (ev.IsCancelled)
+                        {
+                            <span class="badge bg-danger ms-2">
+                                ABGESAGT
+                            </span>
+                        }
+                    </h3><br />
+
+                    
+
+                    @if (ev.IsCancelled)
+                    {
+                        <div class="alert alert-danger mt-3">
+                            <strong>Dieser Event wurde abgesagt.</strong>
+
+                            @if (ev.CancelledAt.HasValue)
+                            {
+                                <br />
+                                <small>
+                                    Abgesagt am
+                                    @ev.CancelledAt.Value.ToString("dd.MM.yyyy HH:mm")
+                                </small>
+                            }
+                        </div>
+                    }
+
+                    <br />
 
                     <div class="event-description">
                         @((MarkupString)FormatBeschreibung(ev.Beschreibung))

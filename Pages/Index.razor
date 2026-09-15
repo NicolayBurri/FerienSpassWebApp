@@ -15,23 +15,182 @@
 @inject DocxService DocxService
 @inject IWebHostEnvironment Env
 
-<PageTitle>Index</PageTitle>
+<PageTitle>FerienSpass</PageTitle>
 
-<h1>Willkommen auf der Startseite von FerienSpass.</h1>
 
-@if (Documents.Count == 0)
-{
-    <p>Es sind noch keine Informationen vorhanden. Wir freuen uns, Sie bald mit aktuellen Informationen beliefern zu dürfen. Mit den besten Grüssen Ihr FerienSpass Team.</p>
-}
-else
-{
-    <h4>Danke für Ihr Interesse. Bitte entnehmen Sie die wichtigsten Informationen auf dieser Startseite.</h4>
+<div class="homepage-container">
 
-    @if (!string.IsNullOrWhiteSpace(WichtigeInformationenHtml))
+    <h1 class="homepage-title">
+        Willkommen auf der Startseite von FerienSpass.
+    </h1>
+
+
+    @* =========================================================
+    ABGESAGTE EVENTS
+    ========================================================= *@
+
+    @if (cancelledEvents.Any())
     {
-        <br />
-        <div style="position:relative; background:silver; border:1px solid #ccc; border-radius:8px; padding:20px; margin-bottom:20px;">
-            <div style="position:absolute;
+        <div class="cancelled-events-box">
+
+            <div class="cancelled-events-title">
+                Abgesagte Events
+            </div>
+
+            <ul class="cancelled-events-list">
+
+                @foreach (var cancelledEvent in cancelledEvents)
+                {
+                    <li>
+                        @cancelledEvent.Eventname
+                    </li>
+                }
+
+            </ul>
+
+        </div>
+    }
+
+
+    @* =========================================================
+    3 ZUFÄLLIGE EVENTS
+    ========================================================= *@
+
+    @if (featuredEvents.Any())
+    {
+        <section class="featured-events-section">
+
+            <h2 class="featured-events-heading">
+                Events entdecken
+            </h2>
+
+            <div class="row g-4">
+
+                @foreach (var featuredEvent in featuredEvents)
+                {
+                    <div class="col-12 col-md-6 col-lg-4">
+
+                        <div class="card featured-event-card h-100">
+
+                            @if (!string.IsNullOrWhiteSpace(
+                           featuredEvent.BildUrl))
+                            {
+                                <div class="featured-event-image-container">
+
+                                    <img src="@GetImageUrl(featuredEvent.BildUrl)"
+                                         class="featured-event-image"
+                                         alt="Bild zu @featuredEvent.Eventname" />
+
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="featured-event-no-image">
+
+                                    <span>
+                                        FerienSpass
+                                    </span>
+
+                                </div>
+                            }
+
+
+                            <div class="card-body featured-event-body">
+
+                                <h3 class="featured-event-title">
+                                    @featuredEvent.Eventname
+                                </h3>
+
+
+                                @if (featuredEvent.StartZeit.HasValue)
+                                {
+                                    <div class="featured-event-date">
+
+                                        <strong>
+                                            Datum:
+                                        </strong>
+
+                                        @featuredEvent.StartZeit.Value
+                                        .ToString("dd.MM.yyyy")
+
+                                        @if (featuredEvent.StartZeit.HasValue)
+                                        {
+                                            <span>
+                                                um
+                                                @featuredEvent.StartZeit.Value
+                                                .ToString("HH:mm")
+                                                Uhr
+                                            </span>
+                                        }
+
+                                    </div>
+                                }
+
+
+                                @if (!string.IsNullOrWhiteSpace(
+                               featuredEvent.Beschreibung))
+                                {
+                                    <p class="featured-event-description">
+
+                                        @GetShortDescription(
+                                                 featuredEvent.Beschreibung)
+
+                                    </p>
+                                }
+
+                            </div>
+
+                        </div>
+
+                    </div>
+                }
+
+            </div>
+
+        </section>
+    }
+
+
+    @* =========================================================
+    BESTEHENDE INFORMATIONEN
+    ========================================================= *@
+
+    @if (Documents.Count == 0)
+    {
+        <p>
+            Es sind noch keine Informationen vorhanden.
+            Wir freuen uns, Sie bald mit aktuellen Informationen
+            beliefern zu dürfen. Mit den besten Grüssen Ihr
+            FerienSpass Team.
+        </p>
+    }
+    else
+    {
+        <h4>
+            Danke für Ihr Interesse. Bitte entnehmen Sie die
+            wichtigsten Informationen auf dieser Startseite.
+        </h4>
+
+
+        @* =====================================================
+    WICHTIGE INFORMATIONEN
+    ===================================================== *@
+
+        @if (!string.IsNullOrWhiteSpace(
+       WichtigeInformationenHtml))
+        {
+            <br />
+
+            <div style="
+                position:relative;
+                background:silver;
+                border:1px solid #ccc;
+                border-radius:8px;
+                padding:20px;
+                margin-bottom:20px;">
+
+                <div style="
+                    position:absolute;
                     top:-12px;
                     left:-12px;
                     width:30px;
@@ -44,71 +203,129 @@ else
                     justify-content:center;
                     align-items:center;
                     border:2px solid white;">
-            i
+
+                    i
+
+                </div>
+
+
+                <div style="
+                    color:red;
+                    font-size:1.15rem;
+                    font-weight:bold;
+                    line-height:2;
+                    margin-bottom:1px;">
+
+                    @((MarkupString)WichtigeInformationenHtml)
+
+                </div>
+
             </div>
+        }
+
+
+        <br />
+
+
+        @* =====================================================
+    ANMELDEINFORMATIONEN
+    ===================================================== *@
+
+        <div style="
+            position:relative;
+            background:#f2f2f2;
+            border:1px solid #ccc;
+            border-radius:8px;
+            padding:20px;
+            margin-bottom:20px;">
+
             <div style="
-            color:red;
-            font-size:1.15rem;
-            font-weight:bold;
-            line-height:2;
-            margin-bottom:1px;">
+                position:absolute;
+                top:-12px;
+                left:-12px;
+                width:30px;
+                height:30px;
+                border-radius:50%;
+                background:blue;
+                color:white;
+                font-weight:bold;
+                display:flex;
+                justify-content:center;
+                align-items:center;
+                border:2px solid white;">
 
-                @((MarkupString)WichtigeInformationenHtml)
+                i
 
             </div>
+
+
+            @if (settings != null)
+            {
+                <h3 style="color:red">
+                    20. FERIENSPASS 21.-25. September 2026:
+                </h3>
+
+
+                @if (isKursleiter)
+                {
+                    <h4>
+                        Anmeldungen ab:
+                        @settings.KursleiterStart?
+                        .ToString("dd.MM.yyyy HH:mm")
+                    </h4>
+
+                    <h4>
+                        Anmeldeschluss:
+                        @settings.KursleiterEnde?
+                        .ToString("dd.MM.yyyy HH:mm")
+                    </h4>
+                }
+                else
+                {
+                    <h4>
+                        Anmeldungen ab:
+                        @settings.AnmeldungStart?
+                        .ToString("dd.MM.yyyy HH:mm")
+                    </h4>
+
+                    <h4>
+                        Anmeldeschluss:
+                        @settings.AnmeldungEnde?
+                        .ToString("dd.MM.yyyy HH:mm")
+                    </h4>
+                }
+
+
+                <h4 style="color:darkred">
+                    Bezahlungen müssen bis am Freitag,
+                    dem 11. September 2026 beglichen werden.
+                </h4>
+            }
 
         </div>
-    }
 
-    <br />
 
-    <div style="position:relative; background:#f2f2f2; border:1px solid #ccc; border-radius:8px; padding:20px; margin-bottom:20px;">
-        <div style="position:absolute;
-                    top:-12px;
-                    left:-12px;
-                    width:30px;
-                    height:30px;
-                    border-radius:50%;
-                    background:blue;
-                    color:white;
-                    font-weight:bold;
-                    display:flex;
-                    justify-content:center;
-                    align-items:center;
-                    border:2px solid white;">
-                i
-         </div>
-        @if (settings != null)
-        {
-            <h3 style="color:red">20. FERIENSPASS 21.-25. September 2026:</h3>
-             @if (isKursleiter)
-            {
-                <h4> Anmeldungen ab: @settings.KursleiterStart?.ToString("dd.MM.yyyy HH:mm") </h4>
-          
-                <h4> Anmeldeschluss: @settings.KursleiterEnde?.ToString("dd.MM.yyyy HH:mm")! </h4>
-            }
-            else
-            {
-                <h4> Anmeldungen ab: @settings.AnmeldungStart?.ToString("dd.MM.yyyy HH:mm") </h4>
+        <br />
 
-                <h4> Anmeldeschluss: @settings.AnmeldungEnde?.ToString("dd.MM.yyyy HH:mm")  </h4>
-            }
-        
-            <h4 style="color:darkred">Bezahlungen müssen bis am Freitag, dem 11. September 2026 beglichen werden. </h4>
-        }
-    </div>
 
-    <br />
+        @* =====================================================
+    SPONSOREN
+    ===================================================== *@
 
-    <h3>
-        Wir danken unseren Sponsoren und HelferInnen ganz Herzlich
-        für ihre finanzielle, materielle oder persönliche Unterstützung.
-        Nur dank ihrer Hilfe ist es uns möglich, den Kindern
-        spannende und erschwingliche Kurse anzubieten!
-    </h3>
-    <br />
+        <h3>
+            Wir danken unseren Sponsoren und HelferInnen ganz
+            Herzlich für ihre finanzielle, materielle oder
+            persönliche Unterstützung. Nur dank ihrer Hilfe ist
+            es uns möglich, den Kindern spannende und
+            erschwingliche Kurse anzubieten!
+        </h3>
 
-    <div style="margin-top:40px;
+
+        <br />
+
+
+        <div style="
+            margin-top:40px;
             padding:15px;
             text-align:center;
             background:lightgreen;
@@ -118,243 +335,808 @@ else
             color:darkgreen;">
 
             Ein Herzliches Dankeschön an unsere Hauptsponsoren:
+
             <br />
             <br />
+
             Einwohnergemeinde Rohrbach, 4938 Rohrbach
+
             <br />
-            Einwohnergemeinde Auswil, 4944 Auswil    
+
+            Einwohnergemeinde Auswil, 4944 Auswil
+
             <br />
-            Einwohnergemeinde Rohrbachgraben, 4938 Rohrbachgraben
+
+            Einwohnergemeinde Rohrbachgraben,
+            4938 Rohrbachgraben
 
         </div>
 
 
-
-
-    @if (!string.IsNullOrWhiteSpace(AktuellerSponsor))
-    {
-        <div style="margin-top:40px;
-        padding:15px;
-        text-align:center;
-        background:#f2f2f2;
-        border-radius:8px;
-        font-size:1.3rem;
-        font-weight:bold;
-        color:green;">
-
-            Ein weiterer Dank geht an: @AktuellerSponsor
-        </div>
-    }
-
-    @if (Sponsoren.Count > 0)
-    {
-        <details style="
-        margin-top:20px;
-        background:#f2f2f2;
-        border-radius:8px;
-        padding:15px;
-        text-align:center;">
-
-            <summary style="
-            cursor:pointer;
-            font-size:1.2rem;
-            font-weight:bold;
-            color:black;
-            user-select:none;">
-                Alle Sponsoren einsehen
-            </summary>
-
+        @if (!string.IsNullOrWhiteSpace(
+       AktuellerSponsor))
+        {
             <div style="
-            margin-top:15px;
-            font-size:1.1rem;
-            line-height:1.8;">
+                margin-top:40px;
+                padding:15px;
+                text-align:center;
+                background:#f2f2f2;
+                border-radius:8px;
+                font-size:1.3rem;
+                font-weight:bold;
+                color:green;">
 
-                @foreach (var sponsor in Sponsoren)
-                {
-                    <div>@sponsor</div>
-                }
+                Ein weiterer Dank geht an:
+                @AktuellerSponsor
 
             </div>
-        </details>
+        }
+
+
+        @if (Sponsoren.Count > 0)
+        {
+            <details style="
+                margin-top:20px;
+                background:#f2f2f2;
+                border-radius:8px;
+                padding:15px;
+                text-align:center;">
+
+                <summary style="
+                    cursor:pointer;
+                    font-size:1.2rem;
+                    font-weight:bold;
+                    color:black;
+                    user-select:none;">
+
+                    Alle Sponsoren einsehen
+
+                </summary>
+
+
+                <div style="
+                    margin-top:15px;
+                    font-size:1.1rem;
+                    line-height:1.8;">
+
+                    @foreach (var sponsor in Sponsoren)
+                    {
+                        <div>
+                            @sponsor
+                        </div>
+                    }
+
+                </div>
+
+            </details>
+        }
     }
-}
+
+</div>
+
+
+@* =============================================================
+   CSS
+   ============================================================= *@
+
+<style>
+
+    /* =========================================================
+           ALLGEMEIN
+           ========================================================= */
+
+    .homepage-container {
+        width: 100%;
+        max-width: 1400px;
+        margin: 0 auto;
+        padding-bottom: 40px;
+    }
+
+    .homepage-title {
+        margin-bottom: 25px;
+    }
+
+
+    /* =========================================================
+           ABGESAGTE EVENTS
+           ========================================================= */
+
+    .cancelled-events-box {
+        border: 1px solid #dc3545;
+        border-left: 5px solid #dc3545;
+        background: #fff5f5;
+        border-radius: 8px;
+        padding: 15px 20px;
+        margin-bottom: 30px;
+    }
+
+    .cancelled-events-title {
+        color: #b02a37;
+        font-size: 1.15rem;
+        font-weight: bold;
+        margin-bottom: 8px;
+    }
+
+    .cancelled-events-list {
+        margin: 0;
+        padding-left: 22px;
+    }
+
+        .cancelled-events-list li {
+            margin-bottom: 3px;
+            font-weight: 500;
+        }
+
+            .cancelled-events-list li:last-child {
+                margin-bottom: 0;
+            }
+
+
+    /* =========================================================
+           FEATURED EVENTS
+           ========================================================= */
+
+    .featured-events-section {
+        margin-top: 25px;
+        margin-bottom: 45px;
+    }
+
+    .featured-events-heading {
+        margin-bottom: 20px;
+    }
+
+    .featured-event-card {
+        border: 1px solid #ddd;
+        border-radius: 10px;
+        overflow: hidden;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+        .featured-event-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+        }
+
+
+    /* =========================================================
+           EVENT BILD
+           ========================================================= */
+
+    .featured-event-image-container {
+        width: 100%;
+        height: 220px;
+        overflow: hidden;
+        background: #eee;
+    }
+
+    .featured-event-image {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .featured-event-no-image {
+        width: 100%;
+        height: 220px;
+        background: #f2f2f2;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        color: #777;
+        font-size: 1.2rem;
+        font-weight: bold;
+    }
+
+
+    /* =========================================================
+           EVENT TEXT
+           ========================================================= */
+
+    .featured-event-body {
+        padding: 18px;
+    }
+
+    .featured-event-title {
+        font-size: 1.35rem;
+        font-weight: bold;
+        margin-bottom: 12px;
+        overflow-wrap: anywhere;
+    }
+
+    .featured-event-date {
+        margin-bottom: 12px;
+        color: #555;
+    }
+
+    .featured-event-description {
+        margin: 0;
+        line-height: 1.55;
+        overflow-wrap: anywhere;
+        white-space: pre-line;
+    }
+
+
+    /* =========================================================
+           TABLET
+           ========================================================= */
+
+    @@media (max-width: 991px) {
+
+        .featured-event-image-container,
+        .featured-event-no-image {
+            height: 210px;
+        }
+    }
+
+
+    /* =========================================================
+           MOBILE
+           ========================================================= */
+
+    @@media (max-width: 767px) {
+
+        .homepage-container {
+            padding-left: 2px;
+            padding-right: 2px;
+        }
+
+        .homepage-title {
+            font-size: 1.8rem;
+            line-height: 1.25;
+        }
+
+        .cancelled-events-box {
+            padding: 14px 16px;
+            margin-bottom: 25px;
+        }
+
+        .featured-events-section {
+            margin-top: 20px;
+            margin-bottom: 35px;
+        }
+
+        .featured-events-heading {
+            font-size: 1.55rem;
+        }
+
+        .featured-event-card {
+            width: 100%;
+        }
+
+        .featured-event-image-container,
+        .featured-event-no-image {
+            height: 230px;
+        }
+
+        .featured-event-body {
+            padding: 15px;
+        }
+
+        .featured-event-title {
+            font-size: 1.3rem;
+        }
+    }
+
+
+    /* =========================================================
+           KLEINE HANDYS
+           ========================================================= */
+
+    @@media (max-width: 420px) {
+
+        .homepage-title {
+            font-size: 1.55rem;
+        }
+
+        .cancelled-events-title {
+            font-size: 1.05rem;
+        }
+
+        .featured-events-heading {
+            font-size: 1.4rem;
+        }
+
+        .featured-event-image-container,
+        .featured-event-no-image {
+            height: 190px;
+        }
+
+        .featured-event-title {
+            font-size: 1.2rem;
+        }
+
+        .featured-event-description {
+            font-size: 0.95rem;
+        }
+    }
+
+</style>
 
 
 @code {
+
+    // =========================================================
+    // BESTEHENDE DATEN
+    // =========================================================
+
     private List<DocItem> Documents = new();
+
     private SystemSettings? settings;
+
     private bool isKursleiter;
+
     private string WichtigeInformationenHtml = "";
 
+
+    // =========================================================
+    // EVENTS
+    // =========================================================
+
+    private List<Event> cancelledEvents = new();
+
+    private List<Event> featuredEvents = new();
+
+
+    // =========================================================
+    // SPONSOREN
+    // =========================================================
+
     private List<string> Sponsoren = new();
+
     private int sponsorIndex = 0;
+
     private System.Timers.Timer? sponsorTimer;
+
 
     private string AktuellerSponsor =>
         Sponsoren.Count > 0
             ? Sponsoren[sponsorIndex]
             : string.Empty;
 
+
+    // =========================================================
+    // INITIALISIERUNG
+    // =========================================================
+
     protected override async Task OnInitializedAsync()
     {
-        await using var Db = await DbFactory.CreateDbContextAsync();
+        await using var Db =
+            await DbFactory.CreateDbContextAsync();
 
-        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
-        var user = authState.User;
 
-        settings = await Db.SystemSettings
-            .AsNoTracking()
-            .FirstOrDefaultAsync();
+        var authState =
+            await AuthenticationStateProvider
+                .GetAuthenticationStateAsync();
+
+        var user =
+            authState.User;
+
+
+        // =====================================================
+        // SYSTEM SETTINGS
+        // =====================================================
+
+        settings =
+            await Db.SystemSettings
+                .AsNoTracking()
+                .FirstOrDefaultAsync();
+
 
         isKursleiter =
             user.IsInRole("Kursleiter") ||
             user.IsInRole("Admin");
 
-        var folder = Path.Combine(
-            Env.WebRootPath,
-            "configsheets/Informationen");
+
+        // =====================================================
+        // ABGESAGTE ZUKÜNFTIGE EVENTS
+        // =====================================================
+
+        cancelledEvents =
+            await Db.Events
+
+                .AsNoTracking()
+
+                .Where(x =>
+                    !x.IsDeleted &&
+                    x.IsCancelled &&
+                    x.StartZeit.HasValue &&
+                    x.StartZeit.Value >= DateTime.Now)
+
+                .OrderBy(x =>
+                    x.StartZeit)
+
+                .ToListAsync();
+
+
+        // =====================================================
+        // VERFÜGBARE EVENTS FÜR STARTSEITE
+        //
+        // Abgesagte und gelöschte Events werden nicht angezeigt.
+        // Nur zukünftige Events.
+        // =====================================================
+
+        var availableEvents =
+            await Db.Events
+
+                .AsNoTracking()
+
+                .Where(x =>
+                    !x.IsDeleted &&
+                    !x.IsCancelled &&
+                    x.StartZeit.HasValue &&
+                    x.StartZeit.Value >= DateTime.Now)
+
+                .ToListAsync();
+
+
+        // =====================================================
+        // 3 ZUFÄLLIGE EVENTS
+        // =====================================================
+
+        featuredEvents =
+            availableEvents
+
+                .OrderBy(x =>
+                    Random.Shared.Next())
+
+                .Take(3)
+
+                .ToList();
+
+
+        // =====================================================
+        // INFORMATIONSDOKUMENTE
+        // =====================================================
+
+        var folder =
+            Path.Combine(
+                Env.WebRootPath,
+                "configsheets/Informationen");
+
 
         if (Directory.Exists(folder))
         {
-            var files = Directory.GetFiles(folder, "*.docx")
-                .Where(x =>
-                    !Path.GetFileName(x)
-                        .Equals(
-                            "WichtigeInformationen.docx",
-                            StringComparison.OrdinalIgnoreCase))
-                .ToArray();
+            var files =
+                Directory.GetFiles(
+                        folder,
+                        "*.docx")
 
-            Documents = files.Select(file => new DocItem
-                {
-                    Title = Regex.Replace(
-                        Path.GetFileNameWithoutExtension(file),
-                        @"\d+\s",
-                        ""),
-                    Html = DocxService.ConvertToHtml(file)
-                }).ToList();
+                    .Where(x =>
+                        !Path.GetFileName(x)
+                            .Equals(
+                                "WichtigeInformationen.docx",
+                                StringComparison.OrdinalIgnoreCase))
+
+                    .ToArray();
+
+
+            Documents =
+                files.Select(file =>
+                    new DocItem
+                        {
+                            Title =
+                                Regex.Replace(
+                                    Path.GetFileNameWithoutExtension(
+                                        file),
+                                    @"\d+\s",
+                                    ""),
+
+                            Html =
+                                DocxService.ConvertToHtml(
+                                    file)
+                        })
+
+                    .ToList();
         }
 
-        var wichtigeInfosDatei = Path.Combine(
+
+        // =====================================================
+        // WICHTIGE INFORMATIONEN
+        // =====================================================
+
+        var wichtigeInfosDatei =
+            Path.Combine(
                 Env.WebRootPath,
                 "configsheets/Informationen",
                 "WichtigeInformationen.docx");
 
+
         if (File.Exists(wichtigeInfosDatei))
         {
             var html =
-                DocxService.ConvertToHtml(wichtigeInfosDatei);
+                DocxService.ConvertToHtml(
+                    wichtigeInfosDatei);
 
-            html = Regex.Replace(
+
+            html =
+                Regex.Replace(
+                    html,
+                    @"<style[^>]*>.*?</style>",
+                    "",
+                    RegexOptions.IgnoreCase |
+                    RegexOptions.Singleline);
+
+
+            html =
+                Regex.Replace(
+                    html,
+                    @"<script[^>]*>.*?</script>",
+                    "",
+                    RegexOptions.IgnoreCase |
+                    RegexOptions.Singleline);
+
+
+            html =
+                Regex.Replace(
+                    html,
+                    @"\sstyle\s*=\s*[""'][^""']*[""']",
+                    "",
+                    RegexOptions.IgnoreCase);
+
+
+            WichtigeInformationenHtml =
+                html;
+        }
+
+
+        // =====================================================
+        // SPONSOREN
+        // =====================================================
+
+        LoadSponsors();
+
+        StartSponsorTimer();
+    }
+
+
+    // =========================================================
+    // EVENT BESCHREIBUNG KÜRZEN
+    // =========================================================
+
+    private string GetShortDescription(
+        string? description)
+    {
+        if (string.IsNullOrWhiteSpace(description))
+        {
+            return "";
+        }
+
+
+        // Zeilenumbrüche für die Kurzansicht etwas bereinigen
+        var cleanDescription =
+            Regex.Replace(
+                description,
+                @"\s+",
+                " ")
+            .Trim();
+
+
+        const int maxLength = 180;
+
+
+        if (cleanDescription.Length <= maxLength)
+        {
+            return cleanDescription;
+        }
+
+
+        // Nicht mitten in einem Wort abschneiden
+        var shortened =
+            cleanDescription.Substring(
+                0,
+                maxLength);
+
+
+        var lastSpace =
+            shortened.LastIndexOf(' ');
+
+
+        if (lastSpace > 0)
+        {
+            shortened =
+                shortened.Substring(
+                    0,
+                    lastSpace);
+        }
+
+
+        return shortened.Trim()
+               + "...";
+    }
+
+
+    // =========================================================
+    // BILD URL
+    // =========================================================
+
+    private string GetImageUrl(
+        string? imageUrl)
+    {
+        if (string.IsNullOrWhiteSpace(imageUrl))
+        {
+            return "";
+        }
+
+
+        // Falls bereits / vorhanden ist, nicht nochmals hinzufügen
+        if (imageUrl.StartsWith("/"))
+        {
+            return imageUrl;
+        }
+
+
+        return "/" + imageUrl;
+    }
+
+
+    // =========================================================
+    // DOC ITEM
+    // =========================================================
+
+    private class DocItem
+    {
+        public string Title { get; set; } = "";
+
+        public string Html { get; set; } = "";
+    }
+
+
+    // =========================================================
+    // SPONSOREN LADEN
+    // =========================================================
+
+    private void LoadSponsors()
+    {
+        var sponsorDatei =
+            Path.Combine(
+                Env.WebRootPath,
+                "configsheets/Informationen",
+                "Sponsoren.docx");
+
+
+        if (!File.Exists(sponsorDatei))
+        {
+            return;
+        }
+
+
+        var html =
+            DocxService.ConvertToHtml(
+                sponsorDatei);
+
+
+        // CSS- und Script-Bereiche vollständig entfernen
+
+        html =
+            Regex.Replace(
                 html,
                 @"<style[^>]*>.*?</style>",
                 "",
                 RegexOptions.IgnoreCase |
                 RegexOptions.Singleline);
 
-            html = Regex.Replace(
+
+        html =
+            Regex.Replace(
                 html,
                 @"<script[^>]*>.*?</script>",
                 "",
                 RegexOptions.IgnoreCase |
                 RegexOptions.Singleline);
 
-            html = Regex.Replace(
+
+        // Absätze und Zeilenumbrüche in echte
+        // Zeilenumbrüche umwandeln
+
+        html =
+            Regex.Replace(
                 html,
-                @"\sstyle\s*=\s*[""'][^""']*[""']",
-                "",
+                @"</?(p|div|li|br)[^>]*>",
+                "\n",
                 RegexOptions.IgnoreCase);
 
-            WichtigeInformationenHtml = html;
-        }
-
-        LoadSponsors();
-        StartSponsorTimer();
-    }
-
-    private class DocItem
-    {
-        public string Title { get; set; } = "";
-        public string Html { get; set; } = "";
-    }
-
-    private void LoadSponsors()
-    {
-        var sponsorDatei = Path.Combine(
-            Env.WebRootPath,
-            "configsheets/Informationen",
-            "Sponsoren.docx");
-
-        if (!File.Exists(sponsorDatei))
-            return;
-
-        var html = DocxService.ConvertToHtml(sponsorDatei);
-
-        // CSS- und Script-Bereiche vollständig entfernen
-        html = Regex.Replace(
-            html,
-            @"<style[^>]*>.*?</style>",
-            "",
-            RegexOptions.IgnoreCase | RegexOptions.Singleline);
-
-        html = Regex.Replace(
-            html,
-            @"<script[^>]*>.*?</script>",
-            "",
-            RegexOptions.IgnoreCase | RegexOptions.Singleline);
-
-        // Absätze und Zeilenumbrüche in echte Zeilenumbrüche umwandeln
-        html = Regex.Replace(
-            html,
-            @"</?(p|div|li|br)[^>]*>",
-            "\n",
-            RegexOptions.IgnoreCase);
 
         // Alle übrigen HTML-Tags entfernen
-        var text = Regex.Replace(html, @"<[^>]+>", "");
+
+        var text =
+            Regex.Replace(
+                html,
+                @"<[^>]+>",
+                "");
+
 
         // HTML-Zeichen wie &amp; zurückwandeln
-        text = System.Net.WebUtility.HtmlDecode(text);
 
-        Sponsoren = text
-            .Split(
-                new[] { '\r', '\n' },
-                StringSplitOptions.RemoveEmptyEntries)
-            .Select(x => x.Trim())
-            .Where(x => !string.IsNullOrWhiteSpace(x))
-            .Where(x => !x.Equals("doc", StringComparison.OrdinalIgnoreCase))
-            .Distinct()
-            .ToList();
+        text =
+            System.Net.WebUtility.HtmlDecode(
+                text);
+
+
+        Sponsoren =
+            text
+
+                .Split(
+                    new[] { '\r', '\n' },
+                    StringSplitOptions.RemoveEmptyEntries)
+
+                .Select(x =>
+                    x.Trim())
+
+                .Where(x =>
+                    !string.IsNullOrWhiteSpace(x))
+
+                .Where(x =>
+                    !x.Equals(
+                        "doc",
+                        StringComparison.OrdinalIgnoreCase))
+
+                .Distinct()
+
+                .ToList();
+
 
         if (Sponsoren.Count > 0)
         {
-            sponsorIndex = Random.Shared.Next(Sponsoren.Count);
+            sponsorIndex =
+                Random.Shared.Next(
+                    Sponsoren.Count);
         }
     }
+
+
+    // =========================================================
+    // SPONSOREN TIMER
+    // =========================================================
 
     private void StartSponsorTimer()
     {
         if (Sponsoren.Count <= 1)
-            return;
-
-        sponsorTimer = new System.Timers.Timer(10_000);
-
-        sponsorTimer.Elapsed += async (_, _) =>
         {
-            sponsorIndex = Random.Shared.Next(Sponsoren.Count);
+            return;
+        }
 
-            if (sponsorIndex >= Sponsoren.Count)
-                sponsorIndex = 0;
 
-            await InvokeAsync(StateHasChanged);
-        };
+        sponsorTimer =
+            new System.Timers.Timer(
+                10_000);
 
-        sponsorTimer.AutoReset = true;
+
+        sponsorTimer.Elapsed +=
+            async (_, _) =>
+            {
+                sponsorIndex =
+                    Random.Shared.Next(
+                        Sponsoren.Count);
+
+
+                if (sponsorIndex >=
+                    Sponsoren.Count)
+                {
+                    sponsorIndex = 0;
+                }
+
+
+                await InvokeAsync(
+                    StateHasChanged);
+            };
+
+
+        sponsorTimer.AutoReset =
+            true;
+
         sponsorTimer.Start();
     }
+
+
+    // =========================================================
+    // DISPOSE
+    // =========================================================
 
     public void Dispose()
     {
         sponsorTimer?.Stop();
+
         sponsorTimer?.Dispose();
     }
 }
