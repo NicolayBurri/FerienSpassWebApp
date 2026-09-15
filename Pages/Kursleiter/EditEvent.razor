@@ -23,6 +23,12 @@ else
 
         <input @bind="ev.Eventname" placeholder="Eventname" />
 
+        @if (ev.IsCancelled){
+            <button class="btn btn-warning" @onclick="() => UndoCancelEvent(ev.Id)">
+                Absage rückgängig machen
+            </button>
+        }
+
         <select @bind="ev.Kategorie">
             <option value="@EventKategorie.Tier">Tiere</option>
             <option value="@EventKategorie.Food">Essen</option>
@@ -503,5 +509,22 @@ else
             ev.BildUrl = $"images/events/{fileName}";
             msg = "Bild hochgeladen! Zum Speichern bitte speichern drücken.";
         }
+    }
+
+    private async Task UndoCancelEvent(int eventId)
+    {
+        await using var Db =
+        await DbFactory.CreateDbContextAsync();
+
+        var ev = await Db.Events
+            .FirstOrDefaultAsync(x => x.Id == eventId);
+
+        if (ev == null)
+            return;
+
+        ev.IsCancelled = false;
+        ev.CancelledAt = null;
+
+        await Db.SaveChangesAsync();
     }
 }

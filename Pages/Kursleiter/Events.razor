@@ -210,15 +210,12 @@
                 </a>
 
 
-                @if (!ev.IsCancelled)
-                {
-                    <a class="btn btn-warning"
-                       href="@($"/kursleiter/events/edit/{ev.Id}")">
+                <a class="btn btn-warning"
+                    href="@($"/kursleiter/events/edit/{ev.Id}")">
 
-                        Bearbeiten
+                    Bearbeiten
 
-                    </a>
-                }
+                </a>
 
             </div>
 
@@ -482,6 +479,13 @@
                                                     @onclick="() => MoveChildToEvent(registration)">
 
                                                 Verschieben
+
+                                            </button>
+
+                                            <button class="btn btn-outline-danger"
+                                                    @onclick="() => RemoveChildFromCancelledEvent(registration)">
+
+                                                Kein Ersatzkurs / Abmelden
 
                                             </button>
 
@@ -1673,5 +1677,277 @@
         LoadEvents();
 
         StateHasChanged();
+    }
+
+    private async Task RemoveChildFromCancelledEvent(
+    EventChild registration)
+    {
+        message = null;
+        messageIsError = false;
+
+        await using var Db =
+            await DbFactory.CreateDbContextAsync();
+
+        await using var transaction =
+            await Db.Database.BeginTransactionAsync();
+
+        try
+        {
+            // =====================================================
+            // ANMELDUNG LADEN
+            // =====================================================
+
+            var enrollment =
+                await Db.EventChildren
+
+                    .Include(x => x.Child)
+
+                    .FirstOrDefaultAsync(x =>
+                        x.Id == registration.Id);
+
+
+            if (enrollment == null)
+            {
+                message =
+                    "Die Anmeldung wurde nicht gefunden.";
+
+                messageIsError = true;
+
+                await transaction.RollbackAsync();
+
+                return;
+            }
+
+
+            // =====================================================
+            // EVENT LADEN
+            // =====================================================
+
+            var oldEvent =
+                await Db.Events
+
+                    .FirstOrDefaultAsync(x =>
+                        x.Id == enrollment.EventId);
+
+
+            if (oldEvent == null)
+            {
+                message =
+                    "Der Event wurde nicht gefunden.";
+
+                messageIsError = true;
+
+                await transaction.RollbackAsync();
+
+                return;
+            }
+
+
+            // =====================================================
+            // NUR BEI ABGESAGTEM EVENT ERLAUBEN
+            // =====================================================
+
+            if (!oldEvent.IsCancelled)
+            {
+                message =
+                    "Diese Funktion kann nur bei "
+                    + "abgesagten Events verwendet werden.";
+
+                messageIsError = true;
+
+                await transaction.RollbackAsync();
+
+                return;
+            }
+
+
+            // =====================================================
+            // INFORMATIONEN MERKEN
+            // =====================================================
+
+            var childName =
+                enrollment.Child?.Name
+                ?? "Das Kind";
+
+            var eventName =
+                oldEvent.Eventname;
+
+            var wasInvoiced =
+                enrollment.IsInvoiced;
+
+            decimal? refundAmount = null;
+
+
+            // =====================================================
+            // WENN VERRECHNET:
+            // ALTES INVOICE ITEM SUCHEN
+            // =====================================================
+
+            if (wasInvoiced)
+            {
+                var oldInvoiceItem =
+                    await Db.InvoiceItems
+
+                        .Include(x => x.Invoice)
+
+                        .Where(x =>
+
+                            x.EventId ==
+                            oldEvent.Id
+
+                            &&
+
+                            x.ChildId ==
+                            enrollment.ChildId)
+
+                        .OrderByDescending(x =>
+                            x.InvoiceId)
+
+                        .FirstOrDefaultAsync();
+
+
+                if (oldInvoiceItem != null)
+                {
+                    refundAmount =
+                        (decimal)oldInvoiceItem.Price;
+
+
+                    // =============================================
+                    // NICHT DOPPELT ERZEUGEN
+                    // =============================================
+
+                    var refundAlreadyExists =
+                        await Db.RefundRequests
+
+                            .AnyAsync(x =>
+
+                                x.InvoiceId ==
+                                oldInvoiceItem.InvoiceId
+
+                                &&
+
+                                x.ChildName ==
+                                childName
+
+                                &&
+
+                                x.EventName ==
+                                eventName);
+
+
+                    // =============================================
+                    // REFUND REQUEST ERSTELLEN
+                    // =============================================
+
+                    if (!refundAlreadyExists)
+                    {
+                        var refundRequest =
+                            new RefundRequest
+                                {
+                                    InvoiceId =
+                                        oldInvoiceItem.InvoiceId,
+
+                                    ChildName =
+                                        childName,
+
+                                    EventName =
+                                        eventName,
+
+                                    // Dein Amount ist aktuell int?
+                                    Amount =
+                                        (int)refundAmount.Value,
+
+                                    CreatedAt =
+                                        DateTime.Now,
+
+                                    IsRefundet =
+                                        false
+                                };
+
+
+                        Db.RefundRequests.Add(
+                            refundRequest);
+                    }
+                }
+            }
+
+
+            // =====================================================
+            // ANMELDUNG LÖSCHEN
+            //
+            // WICHTIG:
+            // InvoiceItem bleibt bestehen!
+            //
+            // Damit bleibt die alte Rechnung historisch erhalten.
+            // =====================================================
+
+            Db.EventChildren.Remove(
+                enrollment);
+
+
+            // =====================================================
+            // SPEICHERN
+            // =====================================================
+
+            await Db.SaveChangesAsync();
+
+            await transaction.CommitAsync();
+
+
+            // =====================================================
+            // AUSWAHL AUFRÄUMEN
+            // =====================================================
+
+            selectedReplacementEvents.Remove(
+                registration.Id);
+
+
+            // =====================================================
+            // MELDUNG
+            // =====================================================
+
+            if (refundAmount.HasValue)
+            {
+                message =
+                    $"{childName} wurde aus dem abgesagten "
+                    + $"Event \"{eventName}\" entfernt. "
+                    + $"Eine Rückerstattung über CHF "
+                    + $"{refundAmount.Value:0.00} "
+                    + $"wurde zur Bearbeitung erstellt.";
+            }
+            else
+            {
+                message =
+                    $"{childName} wurde aus dem abgesagten "
+                    + $"Event \"{eventName}\" entfernt. "
+                    + $"Da der Event noch nicht verrechnet war, "
+                    + $"ist keine Rückerstattung notwendig.";
+            }
+
+
+            messageIsError = false;
+
+
+            // =====================================================
+            // ANZEIGE NEU LADEN
+            // =====================================================
+
+            LoadEvents();
+
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            await transaction.RollbackAsync();
+
+            Console.WriteLine(
+                ex.ToString());
+
+            message =
+                "Beim Abmelden des Kindes ist "
+                + "ein Fehler aufgetreten.";
+
+            messageIsError = true;
+        }
     }
 }
