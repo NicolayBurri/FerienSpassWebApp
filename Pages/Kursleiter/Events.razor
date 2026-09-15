@@ -3,20 +3,39 @@
 @using FerienspassWebApp.Data
 @using FerienspassWebApp.Models
 @using Microsoft.EntityFrameworkCore
-@using Microsoft.AspNetCore.Components.Forms
 @using Microsoft.AspNetCore.Authorization
 
 @attribute [Authorize(Roles = "Admin,Kursleiter")]
+
 @inject NavigationManager Nav
 @inject IDbContextFactory<ApplicationDbContext> DbFactory
 
+
 <h3>Event Verwaltung</h3>
+
+
+@* =========================================================
+   MELDUNGEN
+   ========================================================= *@
+
+@if (!string.IsNullOrWhiteSpace(message))
+{
+    <div class="alert @(messageIsError
+        ? "alert-danger"
+        : "alert-success")">
+
+        @message
+
+    </div>
+}
+
 
 @* =========================================================
    FILTER
    ========================================================= *@
 
 <div class="card mb-4">
+
     <div class="card-body">
 
         <h5 class="card-title mb-3">
@@ -25,7 +44,6 @@
 
         <div class="row g-3">
 
-            @* Jahr *@
             <div class="col-md-4">
 
                 <label class="form-label">
@@ -52,7 +70,6 @@
             </div>
 
 
-            @* Kursleiter *@
             <div class="col-md-4">
 
                 <label class="form-label">
@@ -68,7 +85,6 @@
             </div>
 
 
-            @* Titel *@
             <div class="col-md-4">
 
                 <label class="form-label">
@@ -90,7 +106,9 @@
 
             <button class="btn btn-outline-secondary"
                     @onclick="ResetFilters">
+
                 Filter zurücksetzen
+
             </button>
 
             <span class="ms-3 text-muted">
@@ -100,83 +118,528 @@
         </div>
 
     </div>
+
 </div>
+
+
+@* =========================================================
+   EVENTS
+   ========================================================= *@
 
 @foreach (var ev in pagedEvents)
 {
-    <div style="border:1px solid #ccc; padding:10px; margin-bottom:10px;">
-        <b>@ev.Eventname</b><br />
+    var confirmedCount =
+        GetCount(
+            ev.Id,
+            EnrollmentStatus.Confirmed);
 
-        @ev.StartZeit?.ToString("dd.MM.yyyy HH:mm") -
-        @ev.EndeZeit?.ToString("dd.MM.yyyy HH:mm")<br />
+    var waitingCount =
+        GetCount(
+            ev.Id,
+            EnrollmentStatus.WaitingList);
 
-        <span>Ort: @ev.Location</span><br />
-        <span>Bestätigt: @GetCount(ev.Id, EnrollmentStatus.Confirmed)</span><br />
-        <span>Warteliste: @GetCount(ev.Id, EnrollmentStatus.WaitingList)</span><br /><br />
+    var minimumNotReached =
+        confirmedCount < ev.MinKinder;
 
-        <a class="btn btn-primary"
-           href="@($"/kursleiter/events/{ev.Id}")">
-            Details
-        </a>
-        <a class="btn btn-warning"
-           href="@($"/kursleiter/events/edit/{ev.Id}")">
-            Bearbeiten
-        </a>
 
-        @if (ev.EndeZeit < DateTime.Now)
-        {
-            <br />
-            <br />
-            <button class="btn btn-danger"
-                    @onclick="() => ResetEvent(ev.Id)">
-                Anmeldungen zurücksetzen
-            </button>
-        }
+    <div class="card mb-3">
+
+        <div class="card-body">
+
+            @* =================================================
+        EVENT INFORMATION
+        ================================================= *@
+
+            <h5 class="card-title">
+
+                @ev.Eventname
+
+                @if (ev.IsCancelled)
+                {
+                    <span class="badge bg-danger ms-2">
+                        ABGESAGT
+                    </span>
+                }
+
+            </h5>
+
+
+            <div>
+
+                @if (ev.StartZeit.HasValue)
+                {
+                    <span>
+                        @ev.StartZeit.Value.ToString("dd.MM.yyyy HH:mm")
+                    </span>
+                }
+
+                @if (ev.EndeZeit.HasValue)
+                {
+                    <span>
+                        -
+                        @ev.EndeZeit.Value.ToString("dd.MM.yyyy HH:mm")
+                    </span>
+                }
+
+            </div>
+
+
+            <div>
+                Ort: @ev.Location
+            </div>
+
+            <div>
+                Bestätigt:
+                @confirmedCount
+                / mindestens @ev.MinKinder
+            </div>
+
+            <div>
+                Warteliste:
+                @waitingCount
+            </div>
+
+
+            <div class="mt-3">
+
+                <a class="btn btn-primary"
+                   href="@($"/kursleiter/events/{ev.Id}")">
+
+                    Details
+
+                </a>
+
+
+                @if (!ev.IsCancelled)
+                {
+                    <a class="btn btn-warning"
+                       href="@($"/kursleiter/events/edit/{ev.Id}")">
+
+                        Bearbeiten
+
+                    </a>
+                }
+
+            </div>
+
+
+            @* =================================================
+        MINDESTTEILNEHMERZAHL NICHT ERREICHT
+        ================================================= *@
+
+            @if (minimumNotReached &&
+           !ev.IsCancelled &&
+           ev.StartZeit > DateTime.Now)
+            {
+                <div class="alert alert-warning mt-3 mb-0">
+
+                    <strong>
+                        Mindestteilnehmerzahl nicht erreicht
+                    </strong>
+
+                    <br />
+
+                    Aktuell sind
+
+                    <strong>
+                        @confirmedCount
+                    </strong>
+
+                    von mindestens
+
+                    <strong>
+                        @ev.MinKinder
+                    </strong>
+
+                    Kindern angemeldet.
+
+                    <br /><br />
+
+                    <button class="btn btn-danger"
+                            @onclick="() => CancelEvent(ev.Id)">
+
+                        Event absagen
+
+                    </button>
+
+                </div>
+            }
+
+
+            @* =================================================
+        ABGESAGTER EVENT
+        ================================================= *@
+
+            @if (ev.IsCancelled)
+            {
+                <div class="alert alert-danger mt-3">
+
+                    <h5 class="mb-1">
+                        EVENT ABGESAGT
+                    </h5>
+
+                    <strong>
+                        @ev.Eventname
+                    </strong>
+
+                    @if (ev.StartZeit.HasValue)
+                    {
+                        <br />
+
+                        @ev.StartZeit.Value.ToString("dd.MM.yyyy")
+                    }
+
+                    @if (ev.CancelledAt.HasValue)
+                    {
+                        <br />
+
+                        <small>
+                            Abgesagt am:
+                            @ev.CancelledAt.Value.ToString("dd.MM.yyyy HH:mm")
+                        </small>
+                    }
+
+                </div>
+
+
+                @* =============================================
+        BETROFFENE KINDER
+        ============================================= *@
+
+                var affectedChildren =
+                GetAffectedChildren(ev.Id);
+
+
+                <div class="card mt-3">
+
+                    <div class="card-header">
+
+                        <strong>
+                            Betroffene Kinder
+                        </strong>
+
+                    </div>
+
+
+                    <div class="card-body">
+
+                        @if (!affectedChildren.Any())
+                        {
+                            <div class="alert alert-success mb-0">
+
+                                Es sind keine Kinder mehr diesem
+                                abgesagten Event zugeordnet.
+
+                            </div>
+                        }
+                        else
+                        {
+                            @foreach (var registration in affectedChildren)
+                            {
+                                var replacementEvents =
+                                GetReplacementEvents(
+                                ev,
+                                registration);
+
+                                var refund =
+                                GetRefundInformation(
+                                ev.Id,
+                                registration.ChildId);
+
+
+                                <div class="border rounded p-3 mb-3">
+
+                                    <div class="row g-3">
+
+                                        @* =====================
+                        KIND
+                        ===================== *@
+
+                                        <div class="col-md-3">
+
+                                            <strong>
+                                                @registration.Child.Name
+                                            </strong>
+
+                                            <br />
+
+
+                                            @if (registration.Status ==
+                                           EnrollmentStatus.Confirmed)
+                                            {
+                                                <span class="badge bg-success">
+                                                    Bestätigt
+                                                </span>
+                                            }
+                                            else if (registration.Status ==
+                                            EnrollmentStatus.WaitingList)
+                                            {
+                                                <span class="badge bg-warning text-dark">
+                                                    Warteliste
+                                                </span>
+                                            }
+
+
+                                            @if (refund.HasValue)
+                                            {
+                                                <div class="mt-2">
+
+                                                    <span class="badge bg-info text-dark">
+                                                        Rückerstattung:
+                                                        CHF @refund.Value.ToString("0.00")
+                                                    </span>
+
+                                                </div>
+                                            }
+                                            else if (registration.IsInvoiced)
+                                            {
+                                                <div class="mt-2">
+
+                                                    <span class="badge bg-secondary">
+                                                        Verrechnet
+                                                    </span>
+
+                                                </div>
+                                            }
+                                            else
+                                            {
+                                                <div class="mt-2">
+
+                                                    <span class="badge bg-secondary">
+                                                        Noch nicht verrechnet
+                                                    </span>
+
+                                                </div>
+                                            }
+
+                                        </div>
+
+
+                                        @* =====================
+                        ERSATZKURS
+                        ===================== *@
+
+                                        <div class="col-md-6">
+
+                                            <label class="form-label">
+                                                Ersatzkurs
+                                            </label>
+
+
+                                            @if (replacementEvents.Any())
+                                            {
+                                                <select class="form-select"
+                                                        value="@GetSelectedReplacementEvent(registration.Id)"
+                                                        @onchange="e => SetReplacementEvent(
+                                                            registration.Id,
+                                                            e.Value?.ToString())">
+
+                                                    <option value="">
+                                                        Ersatzkurs auswählen...
+                                                    </option>
+
+
+                                                    @foreach (var replacementEvent
+                                                   in replacementEvents)
+                                                    {
+                                                        <option value="@replacementEvent.Id">
+
+                                                            @replacementEvent.Eventname
+                                                            -
+                                                            @replacementEvent.StartZeit?.ToString("dd.MM.yyyy")
+                                                            -
+                                                            CHF @((replacementEvent.price ?? 0).ToString("0.00"))
+                                                            -
+                                                            @GetFreePlaces(replacementEvent.Id)
+                                                            Plätze frei
+
+                                                        </option>
+                                                    }
+
+                                                </select>
+                                            }
+                                            else
+                                            {
+                                                <div class="alert alert-secondary mb-0">
+
+                                                    Kein verfügbarer Ersatzkurs
+                                                    gefunden.
+
+                                                </div>
+                                            }
+
+                                        </div>
+
+
+                                        @* =====================
+                        VERSCHIEBEN
+                        ===================== *@
+
+                                        <div class="col-md-3 d-flex align-items-end">
+
+                                            <button class="btn btn-success"
+                                                    disabled="@(!HasReplacementEvent(registration.Id))"
+                                                    @onclick="() => MoveChildToEvent(registration)">
+
+                                                Verschieben
+
+                                            </button>
+
+                                        </div>
+
+                                    </div>
+
+
+                                    @if (refund.HasValue)
+                                    {
+                                        <div class="alert alert-info mt-3 mb-0">
+
+                                            Der alte Event wurde bereits
+                                            verrechnet.
+
+                                            <br />
+
+                                            <strong>
+                                                CHF @refund.Value.ToString("0.00")
+                                                gelten als Rückerstattung.
+                                            </strong>
+
+                                            <br />
+
+                                            Nach dem Verschieben wird der neue
+                                            Event wieder als offene
+                                            Rechnungsposition freigegeben.
+
+                                        </div>
+                                    }
+
+                                </div>
+                            }
+                        }
+
+                    </div>
+
+                </div>
+            }
+
+
+            @* =================================================
+        VERGANGENER EVENT
+        ================================================= *@
+
+            @if (ev.EndeZeit < DateTime.Now &&
+           !ev.IsCancelled)
+            {
+                <div class="mt-3">
+
+                    <button class="btn btn-danger"
+                            @onclick="() => ResetEvent(ev.Id)">
+
+                        Anmeldungen zurücksetzen
+
+                    </button>
+
+                </div>
+            }
+
+        </div>
+
     </div>
 }
 
+
+@* =========================================================
+   PAGINATION
+   ========================================================= *@
+
 @if (totalPages > 1)
 {
-    <div class="mt-3" style="display:flex; gap:8px; flex-wrap:wrap;">
+    <div class="mt-3"
+         style="display:flex; gap:8px; flex-wrap:wrap;">
 
         <button class="btn btn-secondary"
                 @onclick="PreviousPage"
                 disabled="@(currentPage == 1)">
+
             ← Zurück
+
         </button>
+
 
         @for (int i = 1; i <= totalPages; i++)
         {
             var pageNumber = i;
 
-            <button class="btn @(pageNumber == currentPage ? "btn-primary" : "btn-outline-primary")"
+            <button class="btn @(pageNumber == currentPage
+                ? "btn-primary"
+                : "btn-outline-primary")"
                     @onclick="() => GoToPage(pageNumber)">
+
                 @pageNumber
+
             </button>
         }
+
 
         <button class="btn btn-secondary"
                 @onclick="NextPage"
                 disabled="@(currentPage == totalPages)">
+
             Weiter →
+
         </button>
 
     </div>
 }
 
+
 @code {
+
+    // =========================================================
+    // DATEN
+    // =========================================================
+
     private List<Event> events = new();
 
-    private string FilterYear = "";
-    private string FilterKursleiter = "";
-    private string FilterTitle = "";
+    private List<EventChild> allEventChildren = new();
 
-    private int currentPage = 1;
-    private const int pageSize = 20;
+    private List<InvoiceItem> allInvoiceItems = new();
+
+
+    // =========================================================
+    // ERSATZKURS-AUSWAHL
+    // =========================================================
+
+    private Dictionary<int, int?>
+        selectedReplacementEvents = new();
+
+
+    // =========================================================
+    // MELDUNGEN
+    // =========================================================
+
+    private string? message;
+
+    private bool messageIsError;
 
 
     // =========================================================
     // FILTER
+    // =========================================================
+
+    private string FilterYear = "";
+
+    private string FilterKursleiter = "";
+
+    private string FilterTitle = "";
+
+    private int currentPage = 1;
+
+    private const int pageSize = 20;
+
+
+    // =========================================================
+    // JAHRE
     // =========================================================
 
     private List<int> AvailableYears =>
@@ -188,16 +651,23 @@
             .ToList();
 
 
+    // =========================================================
+    // FILTER
+    // =========================================================
+
     private List<Event> filteredEvents =>
         events
+
             .Where(x =>
                 string.IsNullOrWhiteSpace(FilterYear)
                 ||
                 (
                     x.StartZeit.HasValue &&
-                    x.StartZeit.Value.Year.ToString() == FilterYear
+                    x.StartZeit.Value.Year.ToString() ==
+                    FilterYear
                 )
             )
+
             .Where(x =>
                 string.IsNullOrWhiteSpace(FilterTitle)
                 ||
@@ -208,6 +678,7 @@
                         StringComparison.OrdinalIgnoreCase)
                 )
             )
+
             .Where(x =>
                 string.IsNullOrWhiteSpace(FilterKursleiter)
                 ||
@@ -238,6 +709,7 @@
                     )
                 )
             )
+
             .ToList();
 
 
@@ -254,7 +726,8 @@
 
     private int totalPages =>
         (int)Math.Ceiling(
-            filteredEvents.Count / (double)pageSize);
+            filteredEvents.Count /
+            (double)pageSize);
 
 
     // =========================================================
@@ -268,19 +741,49 @@
 
 
     // =========================================================
-    // EVENTS LADEN
+    // DATEN LADEN
     // =========================================================
 
-    void LoadEvents()
+    private void LoadEvents()
     {
-        using var Db = DbFactory.CreateDbContext();
+        using var Db =
+            DbFactory.CreateDbContext();
 
-        events = Db.Events
-            .Include(x => x.Kursleiter)
-                .ThenInclude(x => x.User)
-            .Where(x => !x.IsDeleted)
-            .OrderByDescending(x => x.StartZeit)
-            .ToList();
+
+        events =
+            Db.Events
+
+                .Include(x => x.Kursleiter)
+                    .ThenInclude(x => x.User)
+
+                .Where(x => !x.IsDeleted)
+
+                .OrderByDescending(x => x.StartZeit)
+
+                .ToList();
+
+
+        allEventChildren =
+            Db.EventChildren
+
+                .AsNoTracking()
+
+                .Include(x => x.Child)
+
+                .Include(x => x.Event)
+
+                .ToList();
+
+
+        allInvoiceItems =
+            Db.InvoiceItems
+
+                .AsNoTracking()
+
+                .Include(x => x.Invoice)
+
+                .ToList();
+
 
         if (currentPage > totalPages)
         {
@@ -293,26 +796,30 @@
 
 
     // =========================================================
-    // SEITENWECHSEL
+    // PAGINATION
     // =========================================================
 
-    void GoToPage(int pageNumber)
+    private void GoToPage(int pageNumber)
     {
         currentPage = pageNumber;
     }
 
 
-    void NextPage()
+    private void NextPage()
     {
         if (currentPage < totalPages)
+        {
             currentPage++;
+        }
     }
 
 
-    void PreviousPage()
+    private void PreviousPage()
     {
         if (currentPage > 1)
+        {
             currentPage--;
+        }
     }
 
 
@@ -331,7 +838,9 @@
     private void ResetFilters()
     {
         FilterYear = "";
+
         FilterKursleiter = "";
+
         FilterTitle = "";
 
         currentPage = 1;
@@ -342,25 +851,655 @@
     // ANMELDUNGEN ZÄHLEN
     // =========================================================
 
-    int GetCount(int eventId, EnrollmentStatus status)
+    private int GetCount(
+        int eventId,
+        EnrollmentStatus status)
     {
-        using var Db = DbFactory.CreateDbContext();
-
-        return Db.EventChildren.Count(x =>
+        return allEventChildren.Count(x =>
             x.EventId == eventId &&
             x.Status == status);
     }
+
+
+    // =========================================================
+    // BETROFFENE KINDER
+    // =========================================================
+
+    private List<EventChild> GetAffectedChildren(
+        int eventId)
+    {
+        return allEventChildren
+
+            .Where(x =>
+                x.EventId == eventId)
+
+            .OrderBy(x =>
+                x.Child.Name)
+
+            .ToList();
+    }
+
+
+    // =========================================================
+    // RÜCKERSTATTUNGSINFORMATION
+    //
+    // Das vorhandene InvoiceItem bleibt historisch beim
+    // alten Event bestehen.
+    //
+    // Dadurch kennen wir:
+    // - Kind
+    // - alten Event
+    // - verrechneten Preis
+    // =========================================================
+
+    private decimal? GetRefundInformation(
+        int eventId,
+        int childId)
+    {
+        var invoiceItem =
+            allInvoiceItems
+
+                .Where(x =>
+                    x.EventId == eventId &&
+                    x.ChildId == childId)
+
+                .OrderByDescending(x =>
+                    x.InvoiceId)
+
+                .FirstOrDefault();
+
+
+        if (invoiceItem == null)
+        {
+            return null;
+        }
+
+
+        return (decimal)invoiceItem.Price;
+    }
+
+
+    // =========================================================
+    // ERSATZKURSE
+    // =========================================================
+
+    private List<Event> GetReplacementEvents(
+        Event cancelledEvent,
+        EventChild registration)
+    {
+        return events
+
+            // Nicht der abgesagte Event selbst
+            .Where(x =>
+                x.Id != cancelledEvent.Id)
+
+            // Nicht gelöscht
+            .Where(x =>
+                !x.IsDeleted)
+
+            // Nicht abgesagt
+            .Where(x =>
+                !x.IsCancelled)
+
+            // Muss ein Startdatum haben
+            .Where(x =>
+                x.StartZeit.HasValue)
+
+            // Muss in der Zukunft liegen
+            .Where(x =>
+                x.StartZeit!.Value >
+                DateTime.Now)
+
+            // Freier Platz
+            .Where(x =>
+                GetFreePlaces(x.Id) > 0)
+
+            // Kind darf dort nicht bereits
+            // angemeldet sein
+            .Where(x =>
+                !allEventChildren.Any(ec =>
+                    ec.EventId == x.Id &&
+                    ec.ChildId ==
+                    registration.ChildId))
+
+            .OrderBy(x =>
+                x.StartZeit)
+
+            .ToList();
+    }
+
+
+    // =========================================================
+    // FREIE PLÄTZE
+    // =========================================================
+
+    private int GetFreePlaces(
+        int eventId)
+    {
+        var targetEvent =
+            events.FirstOrDefault(x =>
+                x.Id == eventId);
+
+
+        if (targetEvent == null)
+        {
+            return 0;
+        }
+
+
+        var confirmedCount =
+            allEventChildren.Count(x =>
+                x.EventId == eventId &&
+                x.Status ==
+                EnrollmentStatus.Confirmed);
+
+
+        return Math.Max(
+            targetEvent.MaxKinder -
+            confirmedCount,
+            0);
+    }
+
+
+    // =========================================================
+    // ERSATZKURS AUSWÄHLEN
+    // =========================================================
+
+    private void SetReplacementEvent(
+        int eventChildId,
+        string? value)
+    {
+        if (int.TryParse(
+            value,
+            out var replacementEventId))
+        {
+            selectedReplacementEvents[
+                eventChildId] =
+                replacementEventId;
+        }
+        else
+        {
+            selectedReplacementEvents[
+                eventChildId] = null;
+        }
+    }
+
+
+    private int? GetSelectedReplacementEvent(
+        int eventChildId)
+    {
+        return selectedReplacementEvents
+            .GetValueOrDefault(
+                eventChildId);
+    }
+
+
+    private bool HasReplacementEvent(
+        int eventChildId)
+    {
+        return selectedReplacementEvents
+            .TryGetValue(
+                eventChildId,
+                out var eventId)
+
+            && eventId.HasValue;
+    }
+
+
+    // =========================================================
+    // KIND VERSCHIEBEN
+    //
+    // WICHTIG:
+    //
+    // Das alte InvoiceItem wird NICHT verändert.
+    // Es bleibt beim abgesagten Event.
+    //
+    // EventChild wird auf den neuen Event verschoben.
+    //
+    // IsInvoiced = false sorgt dafür, dass der neue Event
+    // wieder unter /user/rechnung-erstellen erscheint.
+    // =========================================================
+
+    private async Task MoveChildToEvent(
+    EventChild registration)
+    {
+        message = null;
+        messageIsError = false;
+
+
+        // =========================================================
+        // ERSATZKURS AUSGEWÄHLT?
+        // =========================================================
+
+        if (!selectedReplacementEvents.TryGetValue(
+                registration.Id,
+                out var replacementEventId)
+            ||
+            !replacementEventId.HasValue)
+        {
+            message =
+                "Bitte zuerst einen Ersatzkurs auswählen.";
+
+            messageIsError = true;
+
+            return;
+        }
+
+
+        await using var Db =
+            await DbFactory.CreateDbContextAsync();
+
+        await using var transaction =
+            await Db.Database.BeginTransactionAsync();
+
+
+        try
+        {
+            // =====================================================
+            // ANMELDUNG LADEN
+            // =====================================================
+
+            var enrollment =
+                await Db.EventChildren
+
+                    .Include(x => x.Child)
+
+                    .FirstOrDefaultAsync(x =>
+                        x.Id == registration.Id);
+
+
+            if (enrollment == null)
+            {
+                message =
+                    "Die Anmeldung wurde nicht gefunden.";
+
+                messageIsError = true;
+
+                await transaction.RollbackAsync();
+
+                return;
+            }
+
+
+            // =====================================================
+            // ALTER EVENT
+            // =====================================================
+
+            var oldEvent =
+                await Db.Events
+                    .FirstOrDefaultAsync(x =>
+                        x.Id == enrollment.EventId);
+
+
+            if (oldEvent == null)
+            {
+                message =
+                    "Der ursprüngliche Event wurde nicht gefunden.";
+
+                messageIsError = true;
+
+                await transaction.RollbackAsync();
+
+                return;
+            }
+
+
+            if (!oldEvent.IsCancelled)
+            {
+                message =
+                    "Kinder können nur aus einem "
+                    + "abgesagten Event verschoben werden.";
+
+                messageIsError = true;
+
+                await transaction.RollbackAsync();
+
+                return;
+            }
+
+
+            // =====================================================
+            // NEUER EVENT
+            // =====================================================
+
+            var newEvent =
+                await Db.Events
+                    .FirstOrDefaultAsync(x =>
+
+                        x.Id == replacementEventId.Value
+
+                        &&
+
+                        !x.IsDeleted
+
+                        &&
+
+                        !x.IsCancelled);
+
+
+            if (newEvent == null)
+            {
+                message =
+                    "Der ausgewählte Ersatzkurs "
+                    + "ist nicht mehr verfügbar.";
+
+                messageIsError = true;
+
+                await transaction.RollbackAsync();
+
+                LoadEvents();
+
+                return;
+            }
+
+
+            // =====================================================
+            // DATUM PRÜFEN
+            // =====================================================
+
+            if (!newEvent.StartZeit.HasValue ||
+                newEvent.StartZeit.Value <= DateTime.Now)
+            {
+                message =
+                    "Der ausgewählte Ersatzkurs "
+                    + "hat bereits stattgefunden.";
+
+                messageIsError = true;
+
+                await transaction.RollbackAsync();
+
+                return;
+            }
+
+
+            // =====================================================
+            // DOPPELANMELDUNG VERHINDERN
+            // =====================================================
+
+            var alreadyRegistered =
+                await Db.EventChildren
+                    .AnyAsync(x =>
+
+                        x.EventId == newEvent.Id
+
+                        &&
+
+                        x.ChildId == enrollment.ChildId
+
+                        &&
+
+                        x.Id != enrollment.Id);
+
+
+            if (alreadyRegistered)
+            {
+                message =
+                    "Das Kind ist bereits für "
+                    + "diesen Event angemeldet.";
+
+                messageIsError = true;
+
+                await transaction.RollbackAsync();
+
+                return;
+            }
+
+
+            // =====================================================
+            // FREIE PLÄTZE PRÜFEN
+            // =====================================================
+
+            var confirmedCount =
+                await Db.EventChildren
+                    .CountAsync(x =>
+
+                        x.EventId == newEvent.Id
+
+                        &&
+
+                        x.Status ==
+                        EnrollmentStatus.Confirmed);
+
+
+            if (confirmedCount >= newEvent.MaxKinder)
+            {
+                message =
+                    "Der ausgewählte Ersatzkurs "
+                    + "ist inzwischen ausgebucht.";
+
+                messageIsError = true;
+
+                await transaction.RollbackAsync();
+
+                LoadEvents();
+
+                return;
+            }
+
+
+            // =====================================================
+            // INFORMATIONEN MERKEN
+            // =====================================================
+
+            var childName =
+                enrollment.Child?.Name
+                ?? "Das Kind";
+
+            var oldEventName =
+                oldEvent.Eventname;
+
+            var newEventName =
+                newEvent.Eventname;
+
+            var wasInvoiced =
+                enrollment.IsInvoiced;
+
+
+            // =====================================================
+            // ALTES INVOICE ITEM SUCHEN
+            //
+            // Nur wenn der alte Event bereits verrechnet wurde.
+            // =====================================================
+
+            InvoiceItem? oldInvoiceItem = null;
+
+
+            if (wasInvoiced)
+            {
+                oldInvoiceItem =
+                    await Db.InvoiceItems
+
+                        .Include(x => x.Invoice)
+
+                        .Where(x =>
+
+                            x.EventId == oldEvent.Id
+
+                            &&
+
+                            x.ChildId == enrollment.ChildId)
+
+                        .OrderByDescending(x =>
+                            x.InvoiceId)
+
+                        .FirstOrDefaultAsync();
+            }
+
+
+            // =====================================================
+            // RÜCKERSTATTUNG ERZEUGEN
+            // =====================================================
+
+            decimal? refundAmount = null;
+
+
+            if (wasInvoiced &&
+                oldInvoiceItem != null)
+            {
+                refundAmount =
+                    (decimal)oldInvoiceItem.Price;
+
+
+                // -------------------------------------------------
+                // Prüfen, ob bereits eine Rückerstattung existiert
+                // -------------------------------------------------
+
+                var refundAlreadyExists =
+                    await Db.RefundRequests
+                        .AnyAsync(x =>
+
+                            x.InvoiceId ==
+                            oldInvoiceItem.InvoiceId
+
+                            &&
+
+                            x.ChildName ==
+                            childName
+
+                            &&
+
+                            x.EventName ==
+                            oldEventName);
+
+
+                // -------------------------------------------------
+                // Neue Rückerstattung anlegen
+                // -------------------------------------------------
+
+                if (!refundAlreadyExists)
+                {
+                    var refundRequest =
+                        new RefundRequest
+                            {
+                                InvoiceId =
+                                    oldInvoiceItem.InvoiceId,
+
+                                ChildName =
+                                    childName,
+
+                                EventName =
+                                    oldEventName,
+
+                                Amount =
+                                    (int)refundAmount.Value,
+
+                                CreatedAt =
+                                    DateTime.Now,
+
+                                IsRefundet =
+                                    false
+                            };
+
+
+                    Db.RefundRequests.Add(
+                        refundRequest);
+                }
+            }
+
+
+            // =====================================================
+            // KIND AUF NEUEN EVENT VERSCHIEBEN
+            // =====================================================
+
+            enrollment.EventId =
+                newEvent.Id;
+
+
+            enrollment.Status =
+                EnrollmentStatus.Confirmed;
+
+
+            // =====================================================
+            // NEUER EVENT MUSS NEU VERRECHNET WERDEN
+            //
+            // Dadurch erscheint er automatisch unter:
+            //
+            // /user/rechnung-erstellen
+            // =====================================================
+
+            enrollment.IsInvoiced =
+                false;
+
+
+            // =====================================================
+            // SPEICHERN
+            // =====================================================
+
+            await Db.SaveChangesAsync();
+
+            await transaction.CommitAsync();
+
+
+            // =====================================================
+            // MELDUNG
+            // =====================================================
+
+            if (refundAmount.HasValue)
+            {
+                message =
+                    $"{childName} wurde von "
+                    + $"\"{oldEventName}\" nach "
+                    + $"\"{newEventName}\" verschoben. "
+                    + $"Für den abgesagten Event wurde eine "
+                    + $"Rückerstattung über CHF "
+                    + $"{refundAmount.Value:0.00} erstellt. "
+                    + $"Der neue Event kann neu verrechnet werden.";
+            }
+            else
+            {
+                message =
+                    $"{childName} wurde von "
+                    + $"\"{oldEventName}\" nach "
+                    + $"\"{newEventName}\" verschoben. "
+                    + $"Der alte Event war noch nicht verrechnet. "
+                    + $"Der neue Event kann jetzt verrechnet werden.";
+            }
+
+
+            messageIsError = false;
+
+
+            selectedReplacementEvents.Remove(
+                registration.Id);
+
+
+            LoadEvents();
+
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            await transaction.RollbackAsync();
+
+            Console.WriteLine(
+                ex.ToString());
+
+
+            message =
+                "Beim Verschieben des Kindes "
+                + "ist ein Fehler aufgetreten.";
+
+            messageIsError = true;
+        }
+    }
+
 
     // =========================================================
     // EVENT ZURÜCKSETZEN
     // =========================================================
 
-    void ResetEvent(int eventId)
+    private void ResetEvent(
+        int eventId)
     {
-        using var Db = DbFactory.CreateDbContext();
+        using var Db =
+            DbFactory.CreateDbContext();
 
-        var ev = Db.Events
-            .FirstOrDefault(x => x.Id == eventId);
+
+        var ev =
+            Db.Events
+                .FirstOrDefault(x =>
+                    x.Id == eventId);
+
 
         if (ev == null ||
             ev.EndeZeit >= DateTime.Now)
@@ -368,16 +1507,168 @@
             return;
         }
 
+
         var registrations =
             Db.EventChildren
+
                 .Where(x =>
-                    x.EventId == eventId)
+                    x.EventId ==
+                    eventId)
+
                 .ToList();
 
-        Db.EventChildren.RemoveRange(
-            registrations);
+
+        Db.EventChildren
+            .RemoveRange(
+                registrations);
+
 
         Db.SaveChanges();
+
+
+        LoadEvents();
+
+        StateHasChanged();
+    }
+
+
+    // =========================================================
+    // EVENT ABSAGEN
+    // =========================================================
+
+    private void CancelEvent(
+        int eventId)
+    {
+        message = null;
+
+        messageIsError = false;
+
+
+        using var Db =
+            DbFactory.CreateDbContext();
+
+
+        var ev =
+            Db.Events
+                .FirstOrDefault(x =>
+                    x.Id ==
+                    eventId);
+
+
+        if (ev == null)
+        {
+            return;
+        }
+
+
+        if (ev.IsCancelled)
+        {
+            return;
+        }
+
+
+        // =====================================================
+        // MINDESTTEILNEHMERZAHL PRÜFEN
+        // =====================================================
+
+        var confirmedCount =
+            Db.EventChildren
+                .Count(x =>
+
+                    x.EventId ==
+                    eventId
+
+                    &&
+
+                    x.Status ==
+                    EnrollmentStatus.Confirmed);
+
+
+        if (confirmedCount >=
+            ev.MinKinder)
+        {
+            message =
+                "Der Event kann nicht abgesagt werden, "
+                + "weil die Mindestteilnehmerzahl "
+                + "erreicht wurde.";
+
+            messageIsError = true;
+
+            return;
+        }
+
+
+        // =====================================================
+        // EVENT ABSAGEN
+        // =====================================================
+
+        ev.IsCancelled = true;
+
+        ev.CancelledAt =
+            DateTime.Now;
+
+
+        // =====================================================
+        // FAHRER UND BETREUUNG ENTFERNEN
+        // =====================================================
+
+        var roleAssignments =
+            Db.EventRoleAssignments
+
+                .Where(x =>
+
+                    x.EventId ==
+                    eventId
+
+                    &&
+
+                    (
+                        x.Role ==
+                        RoleType.Driver
+
+                        ||
+
+                        x.Role ==
+                        RoleType.Helper
+                    )
+                )
+
+                .ToList();
+
+
+        Db.EventRoleAssignments
+            .RemoveRange(
+                roleAssignments);
+
+
+        // =====================================================
+        // WICHTIG:
+        //
+        // EventChildren NICHT löschen.
+        //
+        // InvoiceItems NICHT ändern.
+        //
+        // Dadurch bleiben:
+        //
+        // - betroffene Kinder sichtbar
+        // - alte Rechnungspositionen erhalten
+        // - Rückerstattungsbeträge nachvollziehbar
+        // =====================================================
+
+
+        Db.SaveChanges();
+
+
+        message =
+            $"Der Event \"{ev.Eventname}\" "
+            + "wurde abgesagt. "
+            + "Fahrer und Betreuungspersonen "
+            + "wurden entfernt.";
+
+
+        messageIsError =
+            false;
+
 
         LoadEvents();
 

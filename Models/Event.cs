@@ -49,6 +49,10 @@ namespace FerienspassWebApp.Models
 
         public bool IsArchived { get; set; }
 
+        public bool IsCancelled { get; set; } = false;
+
+        public DateTime? CancelledAt {  get; set; }
+
         public int? CopiedFromEventId { get; set; }
 
         public bool IsDeleted { get; set; } = false;
