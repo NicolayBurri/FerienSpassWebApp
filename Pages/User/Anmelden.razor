@@ -399,12 +399,23 @@ else
             {
                 if (!kursleiterPhase)
                 {
-                    results.Add(new RegistrationResult
-                        {
-                            ChildName = "",
-                            Status = "Kursleiter-Anmeldung noch nicht aktiv",
-                            Color = "red"
-                        });
+                    if (settings.KursleiterStart.Value >= now){
+                        results.Add(new RegistrationResult
+                            {
+                                ChildName = "",
+                                Status = "Kursleiter-Anmeldung noch nicht möglich.",
+                                Color = "red"
+                            });
+                    }
+                    if (settings.KursleiterEnde.Value <= now)
+                    {
+                        results.Add(new RegistrationResult
+                            {
+                                ChildName = "",
+                                Status = "Kursleiter-Anmeldung nicht mehr möglich, Registrierungszeit ist abgelaufen.",
+                                Color = "red"
+                            });
+                    }
 
                     showPopup = true;
                     return;
@@ -414,12 +425,23 @@ else
             {
                 if (!elternPhase)
                 {
-                    results.Add(new RegistrationResult
-                        {
-                            ChildName = "",
-                            Status = "Eltern-Anmeldung noch nicht aktiv",
-                            Color = "red"
-                        });
+                    if (settings.AnmeldungStart.Value >= now){
+                        results.Add(new RegistrationResult
+                            {
+                                ChildName = "",
+                                Status = "Eltern-Anmeldung noch nicht möglich.",
+                                Color = "red"
+                            });
+                    }
+                    if (settings.AnmeldungEnde.Value <= now)
+                    {
+                        results.Add(new RegistrationResult
+                            {
+                                ChildName = "",
+                                Status = "Eltern-Anmeldung nicht mehr möglich, Registrierungszeit ist abgelaufen.",
+                                Color = "red"
+                            });
+                    }
 
                     showPopup = true;
                     return;
