@@ -248,10 +248,12 @@ else
                                                 <span class="status-waiting">Warteliste</span>
                                             }
 
-                                            <button class="btn btn-sm btn-warning"
-                                                    @onclick="() => UnregisterChild(ev.Id, r.ChildId)">
-                                                Abmelden
-                                            </button>
+                                            @if (registration){
+                                                <button class="btn btn-sm btn-warning"
+                                                        @onclick="() => UnregisterChild(ev.Id, r.ChildId)">
+                                                    Abmelden
+                                                </button>
+                                            }
                                         </div>
                                     </li>
                                 }
@@ -506,6 +508,7 @@ else
     private bool showDateFilter = false;
     private DateTime? filterDatum;
     private int currentDayIndex = 0;
+    private bool registration = true;
 
     private List<Event> events = new();
     private List<DateTime> days = new();
@@ -549,6 +552,8 @@ else
             await using var Db = await DbFactory.CreateDbContextAsync();
             var authState = await AuthStateProvider.GetAuthenticationStateAsync();
             var user = authState.User;
+            var settings = await Db.SystemSettings.FirstOrDefaultAsync();
+            var now = DateTime.Now;
 
             userId = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
 
@@ -562,6 +567,11 @@ else
                 .Select(c => c.Id)
                 .ToListAsync();
             // hier überprüfen, ob der Nuter die Daten, die Notfallkontakte schon erfasst hat.
+
+            if (settings.AnmeldungEnde.HasValue && settings.AnmeldungEnde <= now)
+            {
+                registration = false;
+            }
 
 
             await LoadEvents();
