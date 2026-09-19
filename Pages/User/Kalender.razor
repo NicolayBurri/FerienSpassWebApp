@@ -285,10 +285,13 @@ else
                                                 <span>Betreuungsperson</span>
                                             }
 
-                                            <button class="btn btn-sm btn-warning"
-                                                    @onclick="() => UnregisterRole(r.Id)">
-                                                Abmelden
-                                            </button>
+                                            @if (registration)
+                                            {
+                                                <button class="btn btn-sm btn-warning"
+                                                @onclick="() => UnregisterRole(r.Id)">
+                                                    Abmelden
+                                                </button>
+                                            }
                                         </div>
                                     </li>
                                 }
