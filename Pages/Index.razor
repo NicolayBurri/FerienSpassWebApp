@@ -20,9 +20,52 @@
 
 <div class="homepage-container">
 
-    <h1 class="homepage-title">
-        Willkommen auf der Startseite von FerienSpass.
-    </h1>
+    @* =========================================================
+    TITELBILD
+    ========================================================= *@
+
+    <section class="homepage-hero">
+
+        <div class="homepage-hero-text">
+
+            <h1>
+                Willkommen beim FerienSpass
+            </h1>
+
+            <p>
+                Spiel, Spass und unvergessliche Erlebnisse
+                während der Ferien!
+            </p>
+
+        </div>
+
+    </section>
+
+
+    @* =========================================================
+    BILDER AUS PRIVATEFILES/BILDER
+    ========================================================= *@
+
+    @if (PrivateBilder.Count > 0)
+    {
+        <section class="private-picture-section">
+
+            <h3> Impressionen FerienSpass @DateTime.Now.Year</h3>
+            <div class="private-picture-thanks">
+                Herzlichen Dank für die vielen schönen
+                FerienSpass-Momente!
+            </div>
+
+            <div class="private-picture-container">
+
+                <img src="@AktuellesPrivatBild"
+                     class="private-picture"
+                     alt="FerienSpass Impression" />
+
+            </div>
+
+        </section>
+    }
 
 
     @* =========================================================
@@ -112,14 +155,11 @@
 
                                         @featuredEvent.StartZeit.Value.ToString("dd.MM.yyyy")
 
-                                        @if (featuredEvent.StartZeit.HasValue)
-                                        {
-                                            <span>
-                                                um
-                                                @featuredEvent.StartZeit.Value.ToString("HH:mm")
-                                                Uhr
-                                            </span>
-                                        }
+                                        <span>
+                                            um
+                                            @featuredEvent.StartZeit.Value.ToString("HH:mm")
+                                            Uhr
+                                        </span>
 
                                     </div>
                                 }
@@ -164,10 +204,6 @@
     }
     else
     {
-        <h4>
-            Danke für Ihr Interesse. Bitte entnehmen Sie die
-            wichtigsten Informationen auf dieser Startseite.
-        </h4>
 
 
         @* =====================================================
@@ -308,7 +344,7 @@
 
         <h3>
             Wir danken unseren Sponsoren und HelferInnen ganz
-            Herzlich für ihre finanzielle, materielle oder
+            herzlich für ihre finanzielle, materielle oder
             persönliche Unterstützung. Nur dank ihrer Hilfe ist
             es uns möglich, den Kindern spannende und
             erschwingliche Kurse anzubieten!
@@ -328,7 +364,7 @@
             font-weight:bold;
             color:darkgreen;">
 
-            Ein Herzliches Dankeschön an unsere Hauptsponsoren:
+            Ein herzliches Dankeschön an unsere Hauptsponsoren:
 
             <br />
             <br />
@@ -426,8 +462,81 @@
         padding-bottom: 40px;
     }
 
-    .homepage-title {
-        margin-bottom: 25px;
+
+    /* =========================================================
+           TITELBILD
+           ========================================================= */
+
+    .homepage-hero {
+        position: relative;
+        width: 100%;
+        min-height: 380px;
+        margin-bottom: 35px;
+        border-radius: 12px;
+        overflow: hidden;
+        background-color: #f2f2f2;
+        background-image: linear-gradient( rgba(0, 0, 0, 0.20), rgba(0, 0, 0, 0.45) ), url('/Bilder/TitelBild.jpeg');
+        background-size: contain;
+        background-position: center;
+        background-repeat: no-repeat;
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+    }
+
+    .homepage-hero-text {
+        width: 100%;
+        padding: 35px 25px;
+        text-align: center;
+        color: white;
+        text-shadow: 0 2px 6px rgba(0, 0, 0, 0.8);
+    }
+
+        .homepage-hero-text h1 {
+            margin: 0 0 8px 0;
+            font-size: 3rem;
+            font-weight: 800;
+        }
+
+        .homepage-hero-text p {
+            margin: 0;
+            font-size: 1.4rem;
+            font-weight: 500;
+        }
+
+
+    /* =========================================================
+           WECHSELBILDER
+           ========================================================= */
+
+    .private-picture-section {
+        margin: 0 auto 45px auto;
+        text-align: center;
+    }
+
+    .private-picture-thanks {
+        margin-bottom: 15px;
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: #444;
+    }
+
+    .private-picture-container {
+        width: 100%;
+        max-width: 950px;
+        height: 500px;
+        margin: 0 auto;
+        overflow: hidden;
+        border-radius: 12px;
+        background: #f2f2f2;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+    }
+
+    .private-picture {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
     }
 
 
@@ -557,6 +666,14 @@
 
     @@media (max-width: 991px) {
 
+        .homepage-hero {
+            min-height: 330px;
+        }
+
+        .private-picture-container {
+            height: 430px;
+        }
+
         .featured-event-image-container,
         .featured-event-no-image {
             height: 210px;
@@ -575,9 +692,37 @@
             padding-right: 2px;
         }
 
-        .homepage-title {
-            font-size: 1.8rem;
-            line-height: 1.25;
+        .homepage-hero {
+            min-height: 280px;
+            margin-bottom: 28px;
+            border-radius: 8px;
+        }
+
+        .homepage-hero-text {
+            padding: 25px 15px;
+        }
+
+            .homepage-hero-text h1 {
+                font-size: 2rem;
+                line-height: 1.2;
+            }
+
+            .homepage-hero-text p {
+                font-size: 1.1rem;
+            }
+
+        .private-picture-section {
+            margin-bottom: 35px;
+        }
+
+        .private-picture-container {
+            height: 330px;
+            border-radius: 8px;
+        }
+
+        .private-picture-thanks {
+            padding: 0 10px;
+            font-size: 1.1rem;
         }
 
         .cancelled-events-box {
@@ -619,8 +764,28 @@
 
     @@media (max-width: 420px) {
 
-        .homepage-title {
-            font-size: 1.55rem;
+        .homepage-hero {
+            min-height: 230px;
+        }
+
+        .homepage-hero-text {
+            padding: 20px 12px;
+        }
+
+            .homepage-hero-text h1 {
+                font-size: 1.65rem;
+            }
+
+            .homepage-hero-text p {
+                font-size: 1rem;
+            }
+
+        .private-picture-container {
+            height: 250px;
+        }
+
+        .private-picture-thanks {
+            font-size: 1rem;
         }
 
         .cancelled-events-title {
@@ -670,6 +835,23 @@
     private List<Event> cancelledEvents = new();
 
     private List<Event> featuredEvents = new();
+
+
+    // =========================================================
+    // PRIVATE BILDER
+    // =========================================================
+
+    private List<string> PrivateBilder = new();
+
+    private int privateBildIndex = 0;
+
+    private System.Timers.Timer? privateBildTimer;
+
+
+    private string AktuellesPrivatBild =>
+        PrivateBilder.Count > 0
+            ? PrivateBilder[privateBildIndex]
+            : string.Empty;
 
 
     // =========================================================
@@ -745,9 +927,6 @@
 
         // =====================================================
         // VERFÜGBARE EVENTS FÜR STARTSEITE
-        //
-        // Abgesagte und gelöschte Events werden nicht angezeigt.
-        // Nur zukünftige Events.
         // =====================================================
 
         var availableEvents =
@@ -875,12 +1054,128 @@
 
 
         // =====================================================
+        // PRIVATE BILDER
+        // =====================================================
+
+        LoadPrivateBilder();
+
+        StartPrivateBildTimer();
+
+
+        // =====================================================
         // SPONSOREN
         // =====================================================
 
         LoadSponsors();
 
         StartSponsorTimer();
+    }
+
+
+    // =========================================================
+    // PRIVATE BILDER LADEN
+    // =========================================================
+
+    private void LoadPrivateBilder()
+    {
+        var bilderOrdner =
+            Path.Combine(
+                Env.WebRootPath,
+                "Impressionen_Bilder");
+
+
+        if (!Directory.Exists(bilderOrdner))
+        {
+            return;
+        }
+
+
+        var erlaubteEndungen =
+            new[]
+            {
+                ".jpg",
+                ".jpeg",
+                ".png",
+                ".webp",
+                ".gif"
+                };
+
+
+        PrivateBilder =
+            Directory
+                .GetFiles(bilderOrdner)
+
+                .Where(file =>
+                    erlaubteEndungen.Contains(
+                        Path.GetExtension(file),
+                        StringComparer.OrdinalIgnoreCase))
+
+                .Select(file =>
+                    "/Impressionen_Bilder/" +
+                    Uri.EscapeDataString(
+                        Path.GetFileName(file)))
+
+                .ToList();
+
+
+        // Erstes Bild zufällig auswählen
+        if (PrivateBilder.Count > 0)
+        {
+            privateBildIndex =
+                Random.Shared.Next(
+                    PrivateBilder.Count);
+        }
+    }
+
+
+    // =========================================================
+    // PRIVATE BILDER TIMER
+    // =========================================================
+
+    private void StartPrivateBildTimer()
+    {
+        if (PrivateBilder.Count <= 1)
+        {
+            return;
+        }
+
+
+        privateBildTimer =
+            new System.Timers.Timer(
+                10_000);
+
+
+        privateBildTimer.Elapsed +=
+            async (_, _) =>
+            {
+                var neuerIndex =
+                    privateBildIndex;
+
+
+                // Sicherstellen, dass nicht zweimal
+                // hintereinander dasselbe Bild erscheint
+                while (neuerIndex ==
+                       privateBildIndex)
+                {
+                    neuerIndex =
+                        Random.Shared.Next(
+                            PrivateBilder.Count);
+                }
+
+
+                privateBildIndex =
+                    neuerIndex;
+
+
+                await InvokeAsync(
+                    StateHasChanged);
+            };
+
+
+        privateBildTimer.AutoReset =
+            true;
+
+        privateBildTimer.Start();
     }
 
 
@@ -897,7 +1192,6 @@
         }
 
 
-        // Zeilenumbrüche für die Kurzansicht etwas bereinigen
         var cleanDescription =
             Regex.Replace(
                 description,
@@ -915,7 +1209,6 @@
         }
 
 
-        // Nicht mitten in einem Wort abschneiden
         var shortened =
             cleanDescription.Substring(
                 0,
@@ -953,7 +1246,6 @@
         }
 
 
-        // Falls bereits / vorhanden ist, nicht nochmals hinzufügen
         if (imageUrl.StartsWith("/"))
         {
             return imageUrl;
@@ -1099,16 +1391,23 @@
         sponsorTimer.Elapsed +=
             async (_, _) =>
             {
-                sponsorIndex =
-                    Random.Shared.Next(
-                        Sponsoren.Count);
+                var neuerIndex =
+                    sponsorIndex;
 
 
-                if (sponsorIndex >=
-                    Sponsoren.Count)
+                // Wenn mehrere Sponsoren vorhanden sind,
+                // nicht zweimal denselben hintereinander anzeigen
+                while (neuerIndex ==
+                       sponsorIndex)
                 {
-                    sponsorIndex = 0;
+                    neuerIndex =
+                        Random.Shared.Next(
+                            Sponsoren.Count);
                 }
+
+
+                sponsorIndex =
+                    neuerIndex;
 
 
                 await InvokeAsync(
@@ -1129,6 +1428,11 @@
 
     public void Dispose()
     {
+        privateBildTimer?.Stop();
+
+        privateBildTimer?.Dispose();
+
+
         sponsorTimer?.Stop();
 
         sponsorTimer?.Dispose();

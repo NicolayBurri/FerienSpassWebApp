@@ -3,6 +3,7 @@ obj/
 .vs/
 publish/
 PrivateFiles/Rechnungen
+PrivateFiles/Bilder
 *.user
 *.suo
 appsettings.Production.json
